@@ -13,3 +13,10 @@ canvas{width:100%;height:100%;display:block;cursor:crosshair}
 footer{height:38px;display:flex;align-items:end;justify-content:space-between;width:100%;max-width:1260px;margin:auto;color:#496167;font:7px var(--font-geist-mono);letter-spacing:.16em}
 @media(max-width:780px){.game-shell{padding:10px}.topbar{height:48px}.viewport{width:calc(100vw - 20px);max-height:none}.keep-screen{grid-template-columns:1fr}.keep-art{position:absolute;inset:0;opacity:.25}.keep-copy{padding:25px}.keep-copy h1{font-size:35px}.keep-copy>p:not(.eyebrow){display:none}.class-grid{margin:8px 0}.class-card{padding:5px}.class-card small{display:none}.hud.bottom{display:none}.objective{padding-left:15px}.brand small,footer span:nth-child(2){display:none}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+.godot-shell{height:100vh;background:#050c0f;display:grid;grid-template-rows:54px 1fr;overflow:hidden}
+.godot-bar{display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid #294147;background:#081317;color:#dfe8df}
+.godot-bar b{display:block;font:600 13px Georgia,serif;letter-spacing:.18em}.godot-bar span{display:block;color:#5ea9a4;font:8px var(--font-geist-mono);letter-spacing:.14em;text-transform:uppercase;margin-top:3px}
+.godot-controls{font:9px var(--font-geist-mono);color:#8ba19e;letter-spacing:.08em;text-transform:uppercase}
+.godot-game{width:100%;height:100%;border:0;background:#061014}
+@media(max-width:700px){.godot-bar{padding:0 12px}.godot-controls{display:none}}
