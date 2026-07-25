@@ -1,129 +1,169 @@
 extends CharacterBody3D
 
 signal health_changed(current: float, maximum: float)
+signal ability_changed(current: float, maximum: float)
 
-var health := 135.0
-var max_health := 135.0
-var speed := 6.4
+var hero_class := "Ironwarden"
+var health := 150.0
+var max_health := 150.0
+var speed := 6.6
 var attack_cooldown := 0.0
 var ability_cooldown := 0.0
+var max_ability_cooldown := 4.5
 var dash_cooldown := 0.0
 var invulnerable := 0.0
 var facing := Vector3(0, 0, -1)
 var weapon_pivot: Node3D
 var body_material: StandardMaterial3D
-var hit_flash := 0.0
+var class_color := Color("#63d5ca")
+
+func setup(selected: String) -> void:
+	hero_class = selected
+	match hero_class:
+		"Ember Mage": max_health = 95; speed = 6.9; class_color = Color("#ff7045"); max_ability_cooldown = 4.0
+		"Wildbow": max_health = 110; speed = 7.7; class_color = Color("#9bd65b"); max_ability_cooldown = 3.4
+		"Dawn Cleric": max_health = 125; speed = 6.4; class_color = Color("#ffd77a"); max_ability_cooldown = 5.0
+		_: max_health = 150; speed = 6.5; class_color = Color("#63d5ca"); max_ability_cooldown = 4.5
+	health = max_health
 
 func _ready() -> void:
 	add_to_group("hero")
-	_build_ironwarden()
+	_build_character()
+	health_changed.emit(health, max_health)
 
-func mat(color: Color, emission := Color.BLACK, energy := 0.0) -> StandardMaterial3D:
+func mat(color: Color, emission := Color.BLACK, energy := 0.0, metallic := 0.1) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
-	m.albedo_color = color
-	m.roughness = 0.68
-	m.metallic = 0.15
+	m.albedo_color = color; m.roughness = 0.62; m.metallic = metallic
 	if energy > 0.0:
-		m.emission_enabled = true
-		m.emission = emission
-		m.emission_energy_multiplier = energy
+		m.emission_enabled = true; m.emission = emission; m.emission_energy_multiplier = energy
 	return m
 
-func mesh_part(mesh: PrimitiveMesh, material: Material, pos: Vector3, parent: Node = self) -> MeshInstance3D:
-	var part := MeshInstance3D.new()
-	part.mesh = mesh
-	part.material_override = material
-	part.position = pos
-	parent.add_child(part)
-	return part
+func part(mesh: PrimitiveMesh, material: Material, pos: Vector3, parent: Node = self) -> MeshInstance3D:
+	var n := MeshInstance3D.new(); n.mesh = mesh; n.material_override = material; n.position = pos; parent.add_child(n); return n
 
-func _build_ironwarden() -> void:
-	body_material = mat(Color("#536c78"))
-	var shadow := Decal.new()
-	var torso := CapsuleMesh.new(); torso.radius = 0.42; torso.height = 1.25
-	mesh_part(torso, body_material, Vector3(0, 0.98, 0))
-	var cape := BoxMesh.new(); cape.size = Vector3(0.78, 1.05, 0.12)
-	var cape_node := mesh_part(cape, mat(Color("#253a43")), Vector3(0, 0.98, 0.32))
-	cape_node.rotation.x = -0.14
-	var head := SphereMesh.new(); head.radius = 0.29; head.height = 0.58
-	mesh_part(head, mat(Color("#bda986")), Vector3(0, 1.87, 0))
-	var helm := CylinderMesh.new(); helm.top_radius = 0.28; helm.bottom_radius = 0.33; helm.height = 0.28
-	mesh_part(helm, mat(Color("#9cadad")), Vector3(0, 2.08, 0))
-	weapon_pivot = Node3D.new(); weapon_pivot.position = Vector3(0.48, 1.15, 0); add_child(weapon_pivot)
-	var blade := BoxMesh.new(); blade.size = Vector3(0.12, 1.35, 0.08)
-	var blade_node := mesh_part(blade, mat(Color("#d9e2dd"), Color("#bceee7"), 0.25), Vector3(0, 0.46, -0.34), weapon_pivot)
-	blade_node.rotation.x = 0.45
-	var shield := CylinderMesh.new(); shield.top_radius = 0.48; shield.bottom_radius = 0.48; shield.height = 0.12
-	var shield_node := mesh_part(shield, mat(Color("#45616c"), Color("#63d5ca"), 0.35), Vector3(-0.52, 1.08, -0.08))
-	shield_node.rotation.z = PI / 2.0
-	var shape := CapsuleShape3D.new(); shape.radius = 0.42; shape.height = 1.45
-	var collider := CollisionShape3D.new(); collider.shape = shape; collider.position.y = 0.75; add_child(collider)
+func _build_character() -> void:
+	body_material = mat(class_color.darkened(0.48))
+	var torso := CapsuleMesh.new(); torso.radius = 0.43; torso.height = 1.28
+	part(torso, body_material, Vector3(0,1.02,0))
+	var mantle := CylinderMesh.new(); mantle.top_radius=.33; mantle.bottom_radius=.54; mantle.height=.32
+	part(mantle, mat(class_color.darkened(.15)), Vector3(0,1.52,0))
+	var head := SphereMesh.new(); head.radius=.29; head.height=.58
+	part(head, mat(Color("#d4b892")), Vector3(0,1.88,0))
+	var cape := BoxMesh.new(); cape.size=Vector3(.75,1.05,.1)
+	var cape_n := part(cape, mat(class_color.darkened(.6)), Vector3(0,1.0,.36)); cape_n.rotation.x=-.16
+	weapon_pivot=Node3D.new(); weapon_pivot.position=Vector3(.47,1.12,0); add_child(weapon_pivot)
+	match hero_class:
+		"Ember Mage":
+			var hat := CylinderMesh.new(); hat.top_radius=.05;hat.bottom_radius=.46;hat.height=.72
+			part(hat,mat(Color("#4b2943")),Vector3(0,2.28,0))
+			var staff:=CylinderMesh.new();staff.top_radius=.055;staff.bottom_radius=.055;staff.height=1.65
+			part(staff,mat(Color("#5d3928")),Vector3(0,.25,-.3),weapon_pivot)
+			var orb:=SphereMesh.new();orb.radius=.2;orb.height=.4
+			part(orb,mat(class_color,class_color,3.5),Vector3(0,1.08,-.3),weapon_pivot)
+		"Wildbow":
+			var hood:=SphereMesh.new();hood.radius=.36;hood.height=.67
+			part(hood,mat(Color("#31462d")),Vector3(0,1.98,.04))
+			var bow:=TorusMesh.new();bow.inner_radius=.44;bow.outer_radius=.51
+			var b:=part(bow,mat(Color("#9b673d")),Vector3(0,.24,-.3),weapon_pivot);b.scale.x=.5;b.rotation.x=PI/2
+		"Dawn Cleric":
+			var crown:=CylinderMesh.new();crown.top_radius=.31;crown.bottom_radius=.36;crown.height=.25
+			part(crown,mat(Color("#d8b55c")),Vector3(0,2.13,0))
+			var mace:=CylinderMesh.new();mace.top_radius=.08;mace.bottom_radius=.08;mace.height=1.1
+			part(mace,mat(Color("#ddd4b2")),Vector3(0,.2,-.3),weapon_pivot)
+			var sun:=SphereMesh.new();sun.radius=.22;sun.height=.44
+			part(sun,mat(class_color,class_color,2.5),Vector3(0,.8,-.3),weapon_pivot)
+		_:
+			var helm:=CylinderMesh.new();helm.top_radius=.27;helm.bottom_radius=.34;helm.height=.3
+			part(helm,mat(Color("#9cadad")),Vector3(0,2.1,0))
+			var blade:=BoxMesh.new();blade.size=Vector3(.12,1.35,.08)
+			var bn:=part(blade,mat(Color("#e6eee7"),class_color,.3),Vector3(0,.42,-.32),weapon_pivot);bn.rotation.x=.42
+			var shield:=CylinderMesh.new();shield.top_radius=.48;shield.bottom_radius=.48;shield.height=.12
+			var sn:=part(shield,mat(Color("#45616c"),class_color,.25),Vector3(-.55,1.08,-.08));sn.rotation.z=PI/2
+	var shape:=CapsuleShape3D.new();shape.radius=.43;shape.height=1.5
+	var col:=CollisionShape3D.new();col.shape=shape;col.position.y=.75;add_child(col)
 
 func _physics_process(delta: float) -> void:
-	attack_cooldown -= delta
-	ability_cooldown -= delta
-	dash_cooldown -= delta
-	invulnerable -= delta
-	hit_flash -= delta
-	var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
-	var direction := Vector3(input.x, 0, input.y)
-	if direction.length() > 0.1:
-		direction = direction.normalized()
-		facing = direction
-		rotation.y = atan2(-facing.x, -facing.z)
-	velocity = direction * speed
-	move_and_slide()
-	global_position.x = clamp(global_position.x, -12.5, 12.5)
-	global_position.z = clamp(global_position.z, -8.0, 8.0)
-	if Input.is_action_just_pressed("attack"):
-		_attack()
-	if Input.is_action_just_pressed("ability"):
-		_shield_burst()
-	if Input.is_action_just_pressed("dash") and dash_cooldown <= 0.0:
-		velocity = facing * 18.0
-		move_and_slide()
-		dash_cooldown = 1.0
-		invulnerable = 0.32
+	attack_cooldown -= delta; ability_cooldown -= delta; dash_cooldown -= delta; invulnerable -= delta
+	ability_changed.emit(max(ability_cooldown,0),max_ability_cooldown)
+	var input:=Input.get_vector("move_left","move_right","move_up","move_down")
+	var direction:=Vector3(input.x,0,input.y)
+	if direction.length()>.1:
+		direction=direction.normalized();facing=direction;rotation.y=atan2(-facing.x,-facing.z)
+	velocity=direction*speed;move_and_slide()
+	global_position.x=clamp(global_position.x,-12.2,12.2);global_position.z=clamp(global_position.z,-7.7,7.7)
+	if Input.is_action_pressed("attack") and attack_cooldown<=0:_attack()
+	if Input.is_action_just_pressed("ability"):_ability()
+	if Input.is_action_just_pressed("dash") and dash_cooldown<=0:
+		velocity=facing*19.0;move_and_slide();dash_cooldown=.85;invulnerable=.3
+		_burst(class_color,.55)
 
 func _attack() -> void:
-	if attack_cooldown > 0.0: return
-	attack_cooldown = 0.42
-	var tween := create_tween()
-	weapon_pivot.rotation.z = -0.85
-	tween.tween_property(weapon_pivot, "rotation:z", 1.1, 0.13).set_trans(Tween.TRANS_QUAD)
-	tween.tween_property(weapon_pivot, "rotation:z", 0.0, 0.18).set_trans(Tween.TRANS_BACK)
-	await get_tree().create_timer(0.09).timeout
-	for target in get_tree().get_nodes_in_group("damageable"):
-		if not is_instance_valid(target): continue
-		var offset: Vector3 = target.global_position - global_position
-		if offset.length() < 2.35 and facing.dot(offset.normalized()) > 0.15:
-			target.call("take_damage", 34.0, facing * 7.5)
+	attack_cooldown = .36 if hero_class!="Wildbow" else .26
+	var range_value:=2.4
+	var damage:=32.0
+	if hero_class=="Ember Mage": range_value=7.5;damage=25
+	if hero_class=="Wildbow": range_value=9.0;damage=20
+	if hero_class=="Dawn Cleric": damage=28
+	var tween:=create_tween();weapon_pivot.rotation.z=-.75
+	tween.tween_property(weapon_pivot,"rotation:z",.9,.1);tween.tween_property(weapon_pivot,"rotation:z",0.0,.16)
+	if range_value>3:
+		_projectile(damage,range_value)
+	else:
+		await get_tree().create_timer(.07).timeout
+		_damage_cone(damage,range_value,.05)
 
-func _shield_burst() -> void:
-	if ability_cooldown > 0.0: return
-	ability_cooldown = 4.5
+func _projectile(damage: float, range_value: float) -> void:
+	var bolt:=MeshInstance3D.new();var mesh:=SphereMesh.new();mesh.radius=.14;mesh.height=.28
+	bolt.mesh=mesh;bolt.material_override=mat(class_color,class_color,4.0);get_parent().add_child(bolt)
+	bolt.global_position=global_position+Vector3(0,1.0,0)+facing*.8
+	var end:=bolt.global_position+facing*range_value
+	var travel:=create_tween();travel.tween_property(bolt,"global_position",end,.25)
 	for target in get_tree().get_nodes_in_group("damageable"):
-		if not is_instance_valid(target): continue
-		var offset: Vector3 = target.global_position - global_position
-		if offset.length() < 3.7:
-			target.call("take_damage", 24.0, offset.normalized() * 13.0)
-	var ring := MeshInstance3D.new()
-	var ring_mesh := TorusMesh.new(); ring_mesh.inner_radius = 0.94; ring_mesh.outer_radius = 1.08
-	ring.mesh = ring_mesh; ring.material_override = mat(Color("#8bf3e8"), Color("#8bf3e8"), 3.0)
-	ring.position.y = 0.12; add_child(ring)
-	var tween := create_tween().set_parallel()
-	tween.tween_property(ring, "scale", Vector3(4, 4, 4), 0.35)
-	tween.tween_property(ring, "transparency", 1.0, 0.35)
-	tween.chain().tween_callback(ring.queue_free)
+		if is_instance_valid(target):
+			var offset:Vector3=target.global_position-global_position
+			if offset.length()<range_value and facing.dot(offset.normalized())>.87:
+				target.call("take_damage",damage,facing*6);break
+	travel.tween_callback(bolt.queue_free)
 
-func take_damage(amount: float, push: Vector3) -> void:
-	if invulnerable > 0.0: return
-	health = max(0.0, health - amount)
-	velocity += push
-	invulnerable = 0.42
-	hit_flash = 0.15
-	health_changed.emit(health, max_health)
-	if health <= 0.0:
-		global_position = Vector3(0, 0, 6)
-		health = max_health
-		health_changed.emit(health, max_health)
+func _damage_cone(damage:float, reach:float, dot_limit:float)->void:
+	for target in get_tree().get_nodes_in_group("damageable"):
+		if is_instance_valid(target):
+			var offset:Vector3=target.global_position-global_position
+			if offset.length()<reach and facing.dot(offset.normalized())>dot_limit:target.call("take_damage",damage,facing*8)
+
+func _ability() -> void:
+	if ability_cooldown>0:return
+	ability_cooldown=max_ability_cooldown
+	match hero_class:
+		"Ember Mage":
+			for target in get_tree().get_nodes_in_group("damageable"):
+				if is_instance_valid(target) and target.global_position.distance_to(global_position)<5.0:
+					target.call("take_damage",48,(target.global_position-global_position).normalized()*10)
+			_burst(class_color,5.0)
+		"Wildbow":
+			for angle in [-.28,0,.28]:
+				var direction:=facing.rotated(Vector3.UP,angle)
+				for target in get_tree().get_nodes_in_group("damageable"):
+					if is_instance_valid(target):
+						var off:Vector3=target.global_position-global_position
+						if off.length()<10 and direction.dot(off.normalized())>.94:target.call("take_damage",42,direction*7)
+			_burst(class_color,3.2)
+		"Dawn Cleric":
+			health=min(max_health,health+42);health_changed.emit(health,max_health);_burst(class_color,3.8)
+			for target in get_tree().get_nodes_in_group("damageable"):
+				if is_instance_valid(target) and target.global_position.distance_to(global_position)<3.8:target.call("take_damage",30,(target.global_position-global_position).normalized()*8)
+		_:
+			_damage_cone(28,3.8,-1);invulnerable=.65;_burst(class_color,3.8)
+
+func _burst(color:Color, size:float)->void:
+	var ring:=MeshInstance3D.new();var rm:=TorusMesh.new();rm.inner_radius=.85;rm.outer_radius=1.02
+	ring.mesh=rm;ring.material_override=mat(color,color,3.2);ring.position.y=.12;add_child(ring)
+	var tw:=create_tween().set_parallel();tw.tween_property(ring,"scale",Vector3.ONE*size,.35);tw.tween_property(ring,"transparency",1.0,.35)
+	tw.chain().tween_callback(ring.queue_free)
+
+func take_damage(amount:float,push:Vector3)->void:
+	if invulnerable>0:return
+	health=max(0,health-amount);velocity+=push;invulnerable=.38;health_changed.emit(health,max_health)
+	var tw:=create_tween();tw.tween_property(self,"scale",Vector3(1.15,.85,1.15),.06);tw.tween_property(self,"scale",Vector3.ONE,.12)
+	if health<=0:
+		global_position=Vector3(0,0,6);health=max_health;health_changed.emit(health,max_health)

@@ -8,6 +8,7 @@ var core: MeshInstance3D
 
 func _ready() -> void:
 	add_to_group("damageable")
+	add_to_group("gate")
 	_build_gate()
 
 func material(color: Color, emission := Color.BLACK, energy := 0.0) -> StandardMaterial3D:
@@ -50,8 +51,8 @@ func take_damage(amount: float, _push: Vector3) -> void:
 	if health <= 0:
 		active = false
 		remove_from_group("damageable")
+		remove_from_group("gate")
 		var death := create_tween().set_parallel()
 		death.tween_property(self, "scale", Vector3.ZERO, 0.38).set_trans(Tween.TRANS_BACK)
 		death.tween_property(self, "rotation:y", rotation.y + 2.5, 0.38)
 		death.chain().tween_callback(queue_free)
-

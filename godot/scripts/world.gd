@@ -1,87 +1,193 @@
 extends Node3D
 
-const HERO = preload("res://scripts/hero.gd")
-const SPAWNER = preload("res://scripts/spawner.gd")
-var hero: CharacterBody3D
-var health_bar: ProgressBar
-var objective: Label
+const HERO=preload("res://scripts/hero.gd")
+const ENEMY=preload("res://scripts/enemy.gd")
+const SPAWNER=preload("res://scripts/spawner.gd")
+var hero:CharacterBody3D
+var layer:CanvasLayer
+var menu:Control
+var hud:Control
+var health_bar:ProgressBar
+var ability_bar:ProgressBar
+var objective:Label
+var score_label:Label
+var selected_class:="Ironwarden"
+var score:=0
+var stage:=0
+var wave_remaining:=0
+var game_started:=false
+var settings_open:=false
+var gates_spawned:=false
+var boss_spawned:=false
 
-func _ready() -> void:
-	_build_environment()
-	_build_arena()
-	_spawn_encounter()
-	_build_ui()
+func _ready()->void:
+	_build_environment();_build_arena();_build_ui();_show_title()
 
-func material(color: Color, emission := Color.BLACK, energy := 0.0, metallic := 0.0) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new(); m.albedo_color = color; m.roughness = 0.72; m.metallic = metallic
-	if energy > 0:
-		m.emission_enabled = true; m.emission = emission; m.emission_energy_multiplier = energy
+func material(color:Color,emission:=Color.BLACK,energy:=0.0,metallic:=0.0)->StandardMaterial3D:
+	var m:=StandardMaterial3D.new();m.albedo_color=color;m.roughness=.72;m.metallic=metallic
+	if energy>0:m.emission_enabled=true;m.emission=emission;m.emission_energy_multiplier=energy
 	return m
 
-func box_part(name: String, size: Vector3, pos: Vector3, mat: Material, collision := false) -> MeshInstance3D:
-	var node := MeshInstance3D.new(); node.name = name
-	var mesh := BoxMesh.new(); mesh.size = size; node.mesh = mesh; node.material_override = mat; node.position = pos; add_child(node)
+func box_part(name:String,size:Vector3,pos:Vector3,mat:Material,collision:=false)->MeshInstance3D:
+	var n:=MeshInstance3D.new();n.name=name;var mesh:=BoxMesh.new();mesh.size=size;n.mesh=mesh;n.material_override=mat;n.position=pos;add_child(n)
 	if collision:
-		var body := StaticBody3D.new(); var shape := CollisionShape3D.new(); var box := BoxShape3D.new(); box.size = size
-		shape.shape = box; body.position = pos; body.add_child(shape); add_child(body)
-	return node
+		var body:=StaticBody3D.new();var shape:=CollisionShape3D.new();var box:=BoxShape3D.new();box.size=size;shape.shape=box;body.position=pos;body.add_child(shape);add_child(body)
+	return n
 
-func _build_environment() -> void:
-	var env := WorldEnvironment.new()
-	var environment := Environment.new()
-	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color("#061014")
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color("#6f9292")
-	environment.ambient_light_energy = 0.42
-	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	environment.glow_enabled = true
-	environment.glow_intensity = 1.15
-	environment.fog_enabled = true
-	environment.fog_light_color = Color("#17383d")
-	environment.fog_density = 0.018
-	env.environment = environment; add_child(env)
-	var moon := DirectionalLight3D.new(); moon.light_color = Color("#8fc9c7"); moon.light_energy = 1.15; moon.rotation_degrees = Vector3(-58,-32,0); moon.shadow_enabled = true; add_child(moon)
-	var camera := Camera3D.new(); camera.position = Vector3(0,16.5,15.5); camera.rotation_degrees = Vector3(-47,0,0); camera.fov = 41; camera.current = true; add_child(camera)
+func _build_environment()->void:
+	var env:=WorldEnvironment.new();var e:=Environment.new();e.background_mode=Environment.BG_COLOR;e.background_color=Color("#040b0e")
+	e.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;e.ambient_light_color=Color("#6a8f91");e.ambient_light_energy=.36;e.tonemap_mode=Environment.TONE_MAPPER_FILMIC
+	e.glow_enabled=true;e.glow_intensity=1.3;e.fog_enabled=true;e.fog_light_color=Color("#153638");e.fog_density=.016;env.environment=e;add_child(env)
+	var moon:=DirectionalLight3D.new();moon.light_color=Color("#8fc9c7");moon.light_energy=1.1;moon.rotation_degrees=Vector3(-58,-32,0);moon.shadow_enabled=true;add_child(moon)
+	var cam:=Camera3D.new();cam.position=Vector3(0,17,16);cam.rotation_degrees=Vector3(-47,0,0);cam.fov=40;cam.current=true;add_child(cam)
 
-func _build_arena() -> void:
-	var floor_mat := material(Color("#1c3032"))
-	var grout := material(Color("#101e21"))
-	var wall_mat := material(Color("#2c4040"))
-	box_part("Floor", Vector3(28,0.35,19), Vector3(0,-0.2,0), floor_mat, true)
+func _build_arena()->void:
+	var wall:=material(Color("#293f3e"));box_part("Floor",Vector3(28,.35,19),Vector3(0,-.2,0),material(Color("#14282b")),true)
 	for x in range(-12,13,2):
 		for z in range(-8,9,2):
-			box_part("Tile", Vector3(1.82,0.08,1.82), Vector3(x,0.02,z), material(Color("#20383a") if (x+z)%4==0 else Color("#1b3133")))
-	box_part("NorthWall", Vector3(28,3.2,0.8), Vector3(0,1.4,-9.2), wall_mat, true)
-	box_part("SouthWall", Vector3(28,2.0,0.8), Vector3(0,0.8,9.2), wall_mat, true)
-	box_part("WestWall", Vector3(0.8,3.0,19), Vector3(-13.6,1.3,0), wall_mat, true)
-	box_part("EastWall", Vector3(0.8,3.0,19), Vector3(13.6,1.3,0), wall_mat, true)
+			var tile:=box_part("Tile",Vector3(1.82,.08,1.82),Vector3(x,.02,z),material(Color("#20383a") if (x+z)%4==0 else Color("#192e30")))
+			tile.rotation.y=randf_range(-.018,.018)
+	box_part("NorthWall",Vector3(28,3.2,.8),Vector3(0,1.4,-9.2),wall,true);box_part("SouthWall",Vector3(28,2,.8),Vector3(0,.8,9.2),wall,true)
+	box_part("WestWall",Vector3(.8,3,19),Vector3(-13.6,1.3,0),wall,true);box_part("EastWall",Vector3(.8,3,19),Vector3(13.6,1.3,0),wall,true)
 	for pos in [Vector3(-10,0,-6),Vector3(10,0,-6),Vector3(-10,0,6),Vector3(10,0,6)]:
-		var base := box_part("Pillar",Vector3(1.1,2.4,1.1),pos+Vector3(0,1.2,0),wall_mat,true)
-		var fire := OmniLight3D.new(); fire.position=pos+Vector3(0,3.0,0); fire.light_color=Color("#ff923f");fire.light_energy=3.1;fire.omni_range=7.0;add_child(fire)
-		var flame := GPUParticles3D.new(); flame.position=pos+Vector3(0,2.75,0); flame.amount=38; flame.lifetime=0.8
-		var process := ParticleProcessMaterial.new(); process.direction=Vector3.UP;process.spread=22;process.initial_velocity_min=1.2;process.initial_velocity_max=2.4;process.gravity=Vector3(0,0.5,0);process.color=Color("#ff8b35")
-		var quad := QuadMesh.new();quad.size=Vector2(0.18,0.18);flame.process_material=process;flame.draw_pass_1=quad;add_child(flame)
+		box_part("Pillar",Vector3(1.2,2.5,1.2),pos+Vector3(0,1.25,0),wall,true)
+		for y in [0.0,2.4]:box_part("Trim",Vector3(1.5,.24,1.5),pos+Vector3(0,y+.15,0),material(Color("#405856")))
+		var fire:=OmniLight3D.new();fire.position=pos+Vector3(0,3,0);fire.light_color=Color("#ff8f3d");fire.light_energy=3.1;fire.omni_range=7;add_child(fire)
+		var flame:=GPUParticles3D.new();flame.position=pos+Vector3(0,2.75,0);flame.amount=42;flame.lifetime=.8
+		var pp:=ParticleProcessMaterial.new();pp.direction=Vector3.UP;pp.spread=20;pp.initial_velocity_min=1.2;pp.initial_velocity_max=2.5;pp.gravity=Vector3(0,.5,0);pp.color=Color("#ff8b35")
+		var q:=QuadMesh.new();q.size=Vector2(.18,.18);flame.process_material=pp;flame.draw_pass_1=q;add_child(flame)
+	# Raised dais and readable route landmarks.
+	for i in 3:
+		var ring:=CylinderMesh.new();ring.top_radius=2.8-i*.35;ring.bottom_radius=2.8-i*.35;ring.height=.12
+		var n:=MeshInstance3D.new();n.mesh=ring;n.material_override=material(Color("#263b3a"));n.position=Vector3(0,.03+i*.1,-4.8);add_child(n)
 
-func _spawn_encounter() -> void:
-	hero = CharacterBody3D.new(); hero.set_script(HERO); add_child(hero); hero.position=Vector3(0,0,6)
-	hero.connect("health_changed", _on_health_changed)
-	for pos in [Vector3(-8,0,-5),Vector3(8,0,-5),Vector3(0,0,-3)]:
-		var gate := Node3D.new(); gate.set_script(SPAWNER); add_child(gate); gate.position=pos
+func _build_ui()->void:
+	layer=CanvasLayer.new();add_child(layer)
+	menu=Control.new();menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);layer.add_child(menu)
+	hud=Control.new();hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);hud.visible=false;layer.add_child(hud)
+	var shade:=ColorRect.new();shade.color=Color(0.015,.027,.032,.86);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);menu.add_child(shade)
+	var top:=Label.new();top.text="THE SHATTERED KEEP";top.position=Vector2(34,24);top.add_theme_font_size_override("font_size",20);top.modulate=Color("#e7ddc8");hud.add_child(top)
+	health_bar=ProgressBar.new();health_bar.position=Vector2(34,58);health_bar.size=Vector2(300,20);health_bar.show_percentage=false;hud.add_child(health_bar)
+	ability_bar=ProgressBar.new();ability_bar.position=Vector2(34,83);ability_bar.size=Vector2(210,8);ability_bar.show_percentage=false;hud.add_child(ability_bar)
+	var bar_bg:=StyleBoxFlat.new();bar_bg.bg_color=Color("#101d20");bar_bg.corner_radius_top_left=3;bar_bg.corner_radius_top_right=3;bar_bg.corner_radius_bottom_left=3;bar_bg.corner_radius_bottom_right=3
+	var health_fill:=StyleBoxFlat.new();health_fill.bg_color=Color("#c34c45");health_fill.corner_radius_top_left=3;health_fill.corner_radius_top_right=3;health_fill.corner_radius_bottom_left=3;health_fill.corner_radius_bottom_right=3
+	var power_fill:=StyleBoxFlat.new();power_fill.bg_color=Color("#54c9bf");power_fill.corner_radius_top_left=3;power_fill.corner_radius_top_right=3;power_fill.corner_radius_bottom_left=3;power_fill.corner_radius_bottom_right=3
+	health_bar.add_theme_stylebox_override("background",bar_bg);health_bar.add_theme_stylebox_override("fill",health_fill)
+	ability_bar.add_theme_stylebox_override("background",bar_bg);ability_bar.add_theme_stylebox_override("fill",power_fill)
+	objective=Label.new();objective.position=Vector2(760,32);objective.size=Vector2(480,44);objective.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;objective.add_theme_font_size_override("font_size",16);hud.add_child(objective)
+	score_label=Label.new();score_label.position=Vector2(1040,68);score_label.size=Vector2(200,30);score_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;score_label.modulate=Color("#f4ca71");hud.add_child(score_label)
+	var controls:=Label.new();controls.text="MOVE  WASD / STICK     ATTACK  LMB / A     POWER  Q / X     DASH  SHIFT / B     PAUSE  ESC";controls.position=Vector2(284,680);controls.modulate=Color("#a5b8b3");controls.add_theme_font_size_override("font_size",12);hud.add_child(controls)
 
-func _build_ui() -> void:
-	var layer := CanvasLayer.new(); add_child(layer)
-	var title := Label.new(); title.text="THE SHATTERED KEEP";title.position=Vector2(34,25);title.add_theme_font_size_override("font_size",20);title.modulate=Color("#e7ddc8");layer.add_child(title)
-	var subtitle := Label.new();subtitle.text="MOONCRYPT // COMBAT BUILD 01";subtitle.position=Vector2(35,52);subtitle.add_theme_font_size_override("font_size",11);subtitle.modulate=Color("#6bcfc8");layer.add_child(subtitle)
-	health_bar=ProgressBar.new();health_bar.position=Vector2(34,88);health_bar.size=Vector2(310,18);health_bar.max_value=135;health_bar.value=135;health_bar.show_percentage=false;layer.add_child(health_bar)
-	objective=Label.new();objective.text="DESTROY THE THREE MONSTER GATES";objective.position=Vector2(875,36);objective.size=Vector2(365,40);objective.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;objective.add_theme_font_size_override("font_size",15);layer.add_child(objective)
-	var controls := Label.new();controls.text="WASD  MOVE     LMB / SPACE  ATTACK     Q  SHIELD BURST     SHIFT  DASH";controls.position=Vector2(350,675);controls.modulate=Color("#9cb2ae");controls.add_theme_font_size_override("font_size",12);layer.add_child(controls)
+func styled_button(text:String,pos:Vector2,size:Vector2,callable:Callable)->Button:
+	var b:=Button.new();b.text=text;b.position=pos;b.size=size;b.add_theme_font_size_override("font_size",18);b.pressed.connect(callable);menu.add_child(b);return b
 
-func _process(_delta: float) -> void:
-	var gates := get_tree().get_nodes_in_group("damageable").filter(func(n): return n.get_script() == SPAWNER)
-	if objective:
-		objective.text = "DESTROY THE MONSTER GATES  //  %d REMAIN" % gates.size()
-		if gates.is_empty(): objective.text = "THE BOSS DOOR IS OPEN"
+func clear_menu()->void:
+	for child in menu.get_children():
+		if child is ColorRect:continue
+		child.queue_free()
 
-func _on_health_changed(current: float, maximum: float) -> void:
+func label(text:String,pos:Vector2,size:int,color:=Color.WHITE)->Label:
+	var l:=Label.new();l.text=text;l.position=pos;l.add_theme_font_size_override("font_size",size);l.modulate=color;menu.add_child(l);return l
+
+func _show_title()->void:
+	clear_menu();menu.visible=true;hud.visible=false
+	var sigil:=label("SK",Vector2(590,72),52,Color("#63d5ca"));sigil.size=Vector2(100,70);sigil.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	var title:=label("THE SHATTERED KEEP",Vector2(0,165),46,Color("#eadfc9"));title.size=Vector2(1280,60);title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	var sub:=label("MOONCRYPT EXPEDITION",Vector2(0,226),16,Color("#67cfc6"));sub.size=Vector2(1280,30);sub.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	var hook:=label("FOUR HEROES. ONE CURSED KEEP. ENDLESS MONSTERS.",Vector2(0,285),14,Color("#9aa9a4"));hook.size=Vector2(1280,30);hook.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	styled_button("BEGIN EXPEDITION",Vector2(490,360),Vector2(300,56),_show_select)
+	styled_button("SETTINGS",Vector2(490,430),Vector2(300,48),_show_settings)
+	var foot:=label("A  G A U N T L E T - S T Y L E   A R C A D E   A D V E N T U R E",Vector2(0,600),11,Color("#687b78"));foot.size=Vector2(1280,20);foot.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+
+func _show_select()->void:
+	clear_menu();var heading:=label("CHOOSE YOUR HERO",Vector2(0,62),34,Color("#eadfc9"));heading.size=Vector2(1280,50);heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	var subtitle:=label("Each hero has a distinct rhythm, power, and role.",Vector2(0,110),15,Color("#92a7a3"));subtitle.size=Vector2(1280,30);subtitle.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	var classes=[["IRONWARDEN","Shield burst • durable","#63d5ca"],["EMBER MAGE","Fire nova • ranged","#ff7045"],["WILDBOW","Arrow volley • swift","#9bd65b"],["DAWN CLERIC","Heal pulse • balanced","#ffd77a"]]
+	for i in 4:
+		var x=82+i*300;var card:=ColorRect.new();card.position=Vector2(x,180);card.size=Vector2(260,320);card.color=Color(classes[i][2]).darkened(.72);menu.add_child(card)
+		var icon:=label(["IW","EM","WB","DC"][i],Vector2(x,220),42,Color(classes[i][2]));icon.size=Vector2(260,65);icon.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+		var name:=label(classes[i][0],Vector2(x,305),21,Color("#eee4d3"));name.size=Vector2(260,30);name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+		var desc:=label(classes[i][1],Vector2(x,348),13,Color("#b4c2bd"));desc.size=Vector2(260,28);desc.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+		var hero_choice:String=["Ironwarden","Ember Mage","Wildbow","Dawn Cleric"][i]
+		var b:=styled_button("SELECT",Vector2(x+40,420),Vector2(180,48),func():_start_game(hero_choice));b.add_theme_color_override("font_color",Color(classes[i][2]))
+	styled_button("BACK",Vector2(40,635),Vector2(150,42),_show_title)
+
+func _show_settings()->void:
+	clear_menu();settings_open=true;var settings_heading:=label("SETTINGS",Vector2(0,100),36,Color("#eadfc9"));settings_heading.size=Vector2(1280,50);settings_heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	label("MASTER VOLUME",Vector2(390,210),16,Color("#9eb1ad"))
+	var volume:=HSlider.new();volume.position=Vector2(620,210);volume.size=Vector2(270,30);volume.value=85;menu.add_child(volume)
+	label("SCREEN SHAKE",Vector2(390,275),16,Color("#9eb1ad"));var shake:=CheckButton.new();shake.position=Vector2(780,265);shake.button_pressed=true;menu.add_child(shake)
+	label("DAMAGE FLASHES",Vector2(390,340),16,Color("#9eb1ad"));var flashes:=CheckButton.new();flashes.position=Vector2(780,330);flashes.button_pressed=true;menu.add_child(flashes)
+	label("CONTROLS",Vector2(390,405),16,Color("#9eb1ad"));label("Keyboard + mouse / Xbox-style controller",Vector2(620,405),15,Color("#e2d9c8"))
+	styled_button("RETURN",Vector2(490,515),Vector2(300,50),_return_from_settings)
+
+func _return_from_settings()->void:
+	if game_started:_resume()
+	else:_show_title()
+
+func _start_game(which:String)->void:
+	selected_class=which;clear_menu();menu.visible=false;hud.visible=true;game_started=true;score=0;stage=1
+	hero=CharacterBody3D.new();hero.set_script(HERO);hero.call("setup",selected_class);add_child(hero);hero.position=Vector3(0,0,6)
+	hero.connect("health_changed",_on_health);hero.connect("ability_changed",_on_ability)
+	_start_wave(1)
+
+func _start_wave(number:int)->void:
+	stage=number
+	if number<=2:
+		wave_remaining=4+number*2;objective.text="WAVE %d  //  %d CREATURES" %[number,wave_remaining]
+		for i in wave_remaining:
+			await get_tree().create_timer(.28).timeout
+			_spawn_enemy(i%min(number+1,3),Vector3(randf_range(-10,10),0,randf_range(-6,-1)))
+	elif number==3:
+		gates_spawned=true;objective.text="DESTROY THE THREE MONSTER GATES"
+		for pos in [Vector3(-8,0,-5),Vector3(8,0,-5),Vector3(0,0,-3)]:
+			var gate:=Node3D.new();gate.set_script(SPAWNER);add_child(gate);gate.position=pos
+	else:_spawn_boss()
+
+func _spawn_enemy(kind:int,pos:Vector3,elite:=false)->void:
+	var enemy:=CharacterBody3D.new();enemy.set_script(ENEMY);enemy.call("setup",kind,elite);add_child(enemy);enemy.global_position=pos
+
+func _spawn_boss()->void:
+	if boss_spawned:return
+	boss_spawned=true;objective.text="THE CRYPT WARDEN  //  SLAY THE BOSS";_spawn_enemy(3,Vector3(0,0,-5))
+
+func enemy_defeated(kind:int)->void:
+	score+=250 if kind<3 else 2500;score_label.text="%06d" % score
+	if kind==3:_victory()
+	elif stage<=2:
+		wave_remaining-=1;objective.text="WAVE %d  //  %d CREATURES" %[stage,max(wave_remaining,0)]
+		if wave_remaining<=0:
+			objective.text="WAVE CLEARED";await get_tree().create_timer(1.2).timeout;_start_wave(stage+1)
+
+func _process(_delta:float)->void:
+	if game_started and gates_spawned and not boss_spawned:
+		var gates:=get_tree().get_nodes_in_group("gate")
+		objective.text="DESTROY THE MONSTER GATES  //  %d REMAIN"%gates.size()
+		if gates.is_empty():gates_spawned=false;await get_tree().create_timer(1.0).timeout;_start_wave(4)
+	if game_started and Input.is_action_just_pressed("ui_cancel"):
+		if menu.visible:_resume()
+		else:_pause()
+
+func _pause()->void:
+	menu.visible=true;hud.visible=false;get_tree().paused=true;clear_menu()
+	var pause_heading:=label("EXPEDITION PAUSED",Vector2(0,160),36,Color("#eadfc9"));pause_heading.size=Vector2(1280,50);pause_heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	styled_button("RESUME",Vector2(490,290),Vector2(300,52),_resume);styled_button("SETTINGS",Vector2(490,358),Vector2(300,48),_show_settings);styled_button("RETURN TO KEEP",Vector2(490,422),Vector2(300,48),_quit_run)
+
+func _resume()->void:
+	settings_open=false;menu.visible=false;hud.visible=true;get_tree().paused=false
+
+func _quit_run()->void:
+	get_tree().paused=false;get_tree().reload_current_scene()
+
+func _victory()->void:
+	game_started=false;await get_tree().create_timer(.8).timeout;menu.visible=true;hud.visible=false;clear_menu()
+	var victory_heading:=label("CRYPT PURIFIED",Vector2(0,130),42,Color("#f4d179"));victory_heading.size=Vector2(1280,60);victory_heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	var saved:=label("THE KEEP GROWS STRONGER",Vector2(0,210),19,Color("#63d5ca"));saved.size=Vector2(1280,35);saved.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	var reward:=label("+ 1 RELIC SHARD     + FORGE RESTORATION",Vector2(0,285),16,Color("#ddd4c3"));reward.size=Vector2(1280,35);reward.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	var final_score:=label("FINAL SCORE   %06d"%score,Vector2(0,350),24,Color("#f4ca71"));final_score.size=Vector2(1280,40);final_score.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	styled_button("PLAY AGAIN",Vector2(490,465),Vector2(300,52),_quit_run)
+
+func _on_health(current:float,maximum:float)->void:
 	health_bar.max_value=maximum;health_bar.value=current
+func _on_ability(current:float,maximum:float)->void:
+	ability_bar.max_value=maximum;ability_bar.value=maximum-current
