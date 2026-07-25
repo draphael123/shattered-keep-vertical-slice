@@ -27,6 +27,10 @@ var rune_progress:=0
 var puzzle_active:=false
 var puzzle_complete:=false
 var rune_nodes:Array[Node3D]=[]
+var camera:Camera3D
+var awaiting_advance:=false
+var advance_target_z:=0.0
+var pending_stage:=0
 
 func _ready()->void:
 	_build_environment();_build_arena();_build_ui();_show_title()
@@ -47,27 +51,41 @@ func _build_environment()->void:
 	e.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;e.ambient_light_color=Color("#6a8f91");e.ambient_light_energy=.36;e.tonemap_mode=Environment.TONE_MAPPER_FILMIC
 	e.glow_enabled=true;e.glow_intensity=1.3;e.fog_enabled=true;e.fog_light_color=Color("#153638");e.fog_density=.016;env.environment=e;add_child(env)
 	var moon:=DirectionalLight3D.new();moon.light_color=Color("#8fc9c7");moon.light_energy=1.1;moon.rotation_degrees=Vector3(-58,-32,0);moon.shadow_enabled=true;add_child(moon)
-	var cam:=Camera3D.new();cam.position=Vector3(0,17,16);cam.rotation_degrees=Vector3(-47,0,0);cam.fov=40;cam.current=true;add_child(cam)
+	camera=Camera3D.new();camera.position=Vector3(0,17,16);camera.rotation_degrees=Vector3(-47,0,0);camera.fov=40;camera.current=true;add_child(camera)
 
 func _build_arena()->void:
-	var wall:=material(Color("#293f3e"));box_part("Floor",Vector3(28,.35,19),Vector3(0,-.2,0),material(Color("#14282b")),true)
+	var wall:=material(Color("#293f3e"));box_part("Floor",Vector3(26,.35,56),Vector3(0,-.2,-18),material(Color("#14282b")),true)
 	for x in range(-12,13,2):
-		for z in range(-8,9,2):
+		for z in range(-44,9,2):
 			var tile:=box_part("Tile",Vector3(1.82,.08,1.82),Vector3(x,.02,z),material(Color("#20383a") if (x+z)%4==0 else Color("#192e30")))
 			tile.rotation.y=randf_range(-.018,.018)
-	box_part("NorthWall",Vector3(28,3.2,.8),Vector3(0,1.4,-9.2),wall,true);box_part("SouthWall",Vector3(28,2,.8),Vector3(0,.8,9.2),wall,true)
-	box_part("WestWall",Vector3(.8,3,19),Vector3(-13.6,1.3,0),wall,true);box_part("EastWall",Vector3(.8,3,19),Vector3(13.6,1.3,0),wall,true)
-	for pos in [Vector3(-10,0,-6),Vector3(10,0,-6),Vector3(-10,0,6),Vector3(10,0,6)]:
+	box_part("NorthWall",Vector3(26,3.2,.8),Vector3(0,1.4,-46.2),wall,true);box_part("SouthWall",Vector3(26,.65,.8),Vector3(0,.15,9.2),wall,true)
+	box_part("WestWall",Vector3(.8,3,56),Vector3(-13.1,1.3,-18),wall,true);box_part("EastWall",Vector3(.8,3,56),Vector3(13.1,1.3,-18),wall,true)
+	# Room dividers leave a broad central archway and make progression legible.
+	for z in [-8.0,-20.0,-34.0]:
+		box_part("DividerL",Vector3(8.8,3,.8),Vector3(-8.6,1.3,z),wall,true)
+		box_part("DividerR",Vector3(8.8,3,.8),Vector3(8.6,1.3,z),wall,true)
+		for x in [-4.0,4.0]:
+			box_part("ArchPier",Vector3(1.0,3.8,1.2),Vector3(x,1.8,z),material(Color("#3b5250")),true)
+	for pos in [Vector3(-10,0,6),Vector3(10,0,6),Vector3(-10,0,-13),Vector3(10,0,-13),Vector3(-10,0,-28),Vector3(10,0,-28),Vector3(-10,0,-42),Vector3(10,0,-42)]:
 		box_part("Pillar",Vector3(1.2,2.5,1.2),pos+Vector3(0,1.25,0),wall,true)
 		for y in [0.0,2.4]:box_part("Trim",Vector3(1.5,.24,1.5),pos+Vector3(0,y+.15,0),material(Color("#405856")))
 		var fire:=OmniLight3D.new();fire.position=pos+Vector3(0,3,0);fire.light_color=Color("#ff8f3d");fire.light_energy=3.1;fire.omni_range=7;add_child(fire)
 		var flame:=GPUParticles3D.new();flame.position=pos+Vector3(0,2.75,0);flame.amount=42;flame.lifetime=.8
 		var pp:=ParticleProcessMaterial.new();pp.direction=Vector3.UP;pp.spread=20;pp.initial_velocity_min=1.2;pp.initial_velocity_max=2.5;pp.gravity=Vector3(0,.5,0);pp.color=Color("#ff8b35")
 		var q:=QuadMesh.new();q.size=Vector2(.18,.18);flame.process_material=pp;flame.draw_pass_1=q;add_child(flame)
-	# Raised dais and readable route landmarks.
+	# Raised focal dais in the final boss chamber.
 	for i in 3:
 		var ring:=CylinderMesh.new();ring.top_radius=2.8-i*.35;ring.bottom_radius=2.8-i*.35;ring.height=.12
-		var n:=MeshInstance3D.new();n.mesh=ring;n.material_override=material(Color("#263b3a"));n.position=Vector3(0,.03+i*.1,-4.8);add_child(n)
+		var n:=MeshInstance3D.new();n.mesh=ring;n.material_override=material(Color("#263b3a"));n.position=Vector3(0,.03+i*.1,-41);add_child(n)
+	# Repeated arches, rubble and banners create a consistent authored route.
+	for z in [4.0,-12.0,-26.0,-40.0]:
+		for x in [-11.4,11.4]:
+			box_part("WallButtress",Vector3(1.1,4.0,1.6),Vector3(x,1.8,z),material(Color("#344b49")))
+	for z in [-3.0,-16.0,-30.0]:
+		for x in [-9.5,9.5]:
+			var rubble:=box_part("Rubble",Vector3(1.4,.65,1.1),Vector3(x,.3,z),material(Color("#314341")))
+			rubble.rotation_degrees=Vector3(randf_range(-8,8),randf_range(0,45),randf_range(-6,6))
 
 func _build_ui()->void:
 	layer=CanvasLayer.new();add_child(layer)
@@ -87,7 +105,15 @@ func _build_ui()->void:
 	var controls:=Label.new();controls.text="MOVE  WASD / STICK     ATTACK  LMB / A     POWER  Q / X     DASH  SHIFT / B     PAUSE  ESC";controls.position=Vector2(284,680);controls.modulate=Color("#a5b8b3");controls.add_theme_font_size_override("font_size",12);hud.add_child(controls)
 
 func styled_button(text:String,pos:Vector2,size:Vector2,callable:Callable)->Button:
-	var b:=Button.new();b.text=text;b.position=pos;b.size=size;b.add_theme_font_size_override("font_size",18);b.pressed.connect(callable);menu.add_child(b);return b
+	var b:=Button.new();b.text=text;b.position=pos;b.size=size;b.add_theme_font_size_override("font_size",18);b.pressed.connect(callable)
+	var normal:=StyleBoxFlat.new();normal.bg_color=Color("#142225");normal.border_color=Color("#415452");normal.set_border_width_all(1);normal.corner_radius_top_left=3;normal.corner_radius_top_right=3;normal.corner_radius_bottom_left=3;normal.corner_radius_bottom_right=3
+	var focus:=normal.duplicate();focus.bg_color=Color("#273b39");focus.border_color=Color("#e5bd65");focus.set_border_width_all(3)
+	var hover:=normal.duplicate();hover.bg_color=Color("#203432");hover.border_color=Color("#68d1c7");hover.set_border_width_all(2)
+	var pressed:=focus.duplicate();pressed.bg_color=Color("#4a4030")
+	b.add_theme_stylebox_override("normal",normal);b.add_theme_stylebox_override("focus",focus);b.add_theme_stylebox_override("hover",hover);b.add_theme_stylebox_override("pressed",pressed)
+	b.focus_mode=Control.FOCUS_ALL;b.mouse_default_cursor_shape=Control.CURSOR_POINTING_HAND;menu.add_child(b)
+	if not menu.get_viewport().gui_get_focus_owner():b.grab_focus()
+	return b
 
 func clear_menu()->void:
 	for child in menu.get_children():
@@ -144,14 +170,15 @@ func _start_wave(number:int)->void:
 	stage=number
 	if number<=2:
 		wave_remaining=4+number*2;objective.text="WAVE %d  //  %d CREATURES" %[number,wave_remaining]
+		var room_z:float=-2.0 if number==1 else -14.0
 		for i in wave_remaining:
 			await get_tree().create_timer(.28).timeout
-			_spawn_enemy(i%min(number+1,3),Vector3(randf_range(-10,10),0,randf_range(-6,-1)))
+			_spawn_enemy(i%min(number+1,3),Vector3(randf_range(-9,9),0,room_z+randf_range(-3,3)))
 	elif number==3:
 		_start_puzzle()
 	elif number==4:
 		gates_spawned=true;objective.text="DESTROY THE THREE MONSTER GATES"
-		for pos in [Vector3(-8,0,-5),Vector3(8,0,-5),Vector3(0,0,-3)]:
+		for pos in [Vector3(-8,0,-29),Vector3(8,0,-29),Vector3(0,0,-26)]:
 			var gate:=Node3D.new();gate.set_script(SPAWNER);add_child(gate);gate.position=pos
 	else:_spawn_boss()
 
@@ -160,14 +187,14 @@ func _spawn_enemy(kind:int,pos:Vector3,elite:=false)->void:
 
 func _spawn_boss()->void:
 	if boss_spawned:return
-	boss_spawned=true;objective.text="THE CRYPT WARDEN  //  SLAY THE BOSS";_spawn_enemy(3,Vector3(0,0,-5))
+	boss_spawned=true;objective.text="THE CRYPT WARDEN  //  SLAY THE BOSS";_spawn_enemy(3,Vector3(0,0,-41))
 
 func _spawn_breakables()->void:
 	for i in 10:
 		var item:=Node3D.new();item.set_script(BREAKABLE);item.call("setup",i%2);add_child(item)
 		var side:float=-1.0 if i%2==0 else 1.0
-		item.position=Vector3(side*(9.2+(i%3)*.85),0,-6.3+(i/2)*2.5)
-	for pos in [Vector3(-5.2,0,1.4),Vector3(-1.8,0,1.4),Vector3(1.8,0,1.4),Vector3(5.2,0,1.4)]:
+		item.position=Vector3(side*(9.2+(i%3)*.65),0,4.0-(i/2)*9.5)
+	for pos in [Vector3(-5.2,0,-16),Vector3(-1.8,0,-16),Vector3(1.8,0,-16),Vector3(5.2,0,-16)]:
 		var trap:=Node3D.new();trap.set_script(TRAP);add_child(trap);trap.position=pos
 
 func breakable_destroyed(pos:Vector3)->void:
@@ -180,7 +207,7 @@ func collect_treasure(value:int)->void:
 
 func _start_puzzle()->void:
 	puzzle_active=true;rune_progress=0;objective.text="RUNE LOCK  //  STEP ON 1 • 2 • 3"
-	var positions=[Vector3(-3.3,0,-3.9),Vector3(0,0,-5.1),Vector3(3.3,0,-3.9)]
+	var positions=[Vector3(-3.3,0,-24),Vector3(0,0,-25.2),Vector3(3.3,0,-24)]
 	for i in 3:
 		var rune:=Node3D.new();rune.set_script(RUNE);rune.call("setup",i);add_child(rune);rune.position=positions[i];rune.connect("stepped",_on_rune_stepped);rune_nodes.append(rune)
 
@@ -205,9 +232,15 @@ func enemy_defeated(kind:int)->void:
 	elif stage<=2:
 		wave_remaining-=1;objective.text="WAVE %d  //  %d CREATURES" %[stage,max(wave_remaining,0)]
 		if wave_remaining<=0:
-			objective.text="WAVE CLEARED";await get_tree().create_timer(1.2).timeout;_start_wave(stage+1)
+			pending_stage=stage+1;advance_target_z=-9.0 if pending_stage==2 else -21.0;awaiting_advance=true
+			objective.text="PATH OPEN  //  ADVANCE TO THE NEXT CHAMBER"
 
-func _process(_delta:float)->void:
+func _process(delta:float)->void:
+	if game_started and is_instance_valid(hero) and is_instance_valid(camera):
+		var desired:=Vector3(clamp(hero.global_position.x*.18,-2.2,2.2),17,hero.global_position.z+16)
+		camera.global_position=camera.global_position.lerp(desired,1.0-exp(-delta*4.5))
+	if awaiting_advance and is_instance_valid(hero) and hero.global_position.z<advance_target_z:
+		awaiting_advance=false;_start_wave(pending_stage)
 	if game_started and gates_spawned and not boss_spawned:
 		var gates:=get_tree().get_nodes_in_group("gate")
 		objective.text="DESTROY THE MONSTER GATES  //  %d REMAIN"%gates.size()

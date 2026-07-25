@@ -90,7 +90,7 @@ func _physics_process(delta: float) -> void:
 	if direction.length()>.1:
 		direction=direction.normalized();facing=direction;rotation.y=atan2(-facing.x,-facing.z)
 	velocity=direction*speed;move_and_slide()
-	global_position.x=clamp(global_position.x,-12.2,12.2);global_position.z=clamp(global_position.z,-7.7,7.7)
+	global_position.x=clamp(global_position.x,-11.6,11.6);global_position.z=clamp(global_position.z,-45.0,7.6)
 	if Input.is_action_pressed("attack") and attack_cooldown<=0:_attack()
 	if Input.is_action_just_pressed("ability"):_ability()
 	if Input.is_action_just_pressed("dash") and dash_cooldown<=0:
