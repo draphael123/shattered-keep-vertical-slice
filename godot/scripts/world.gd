@@ -3,6 +3,10 @@ extends Node3D
 const HERO=preload("res://scripts/hero.gd")
 const ENEMY=preload("res://scripts/enemy.gd")
 const SPAWNER=preload("res://scripts/spawner.gd")
+const BREAKABLE=preload("res://scripts/breakable.gd")
+const PICKUP=preload("res://scripts/pickup.gd")
+const TRAP=preload("res://scripts/trap.gd")
+const RUNE=preload("res://scripts/rune.gd")
 var hero:CharacterBody3D
 var layer:CanvasLayer
 var menu:Control
@@ -19,6 +23,10 @@ var game_started:=false
 var settings_open:=false
 var gates_spawned:=false
 var boss_spawned:=false
+var rune_progress:=0
+var puzzle_active:=false
+var puzzle_complete:=false
+var rune_nodes:Array[Node3D]=[]
 
 func _ready()->void:
 	_build_environment();_build_arena();_build_ui();_show_title()
@@ -129,6 +137,7 @@ func _start_game(which:String)->void:
 	selected_class=which;clear_menu();menu.visible=false;hud.visible=true;game_started=true;score=0;stage=1
 	hero=CharacterBody3D.new();hero.set_script(HERO);hero.call("setup",selected_class);add_child(hero);hero.position=Vector3(0,0,6)
 	hero.connect("health_changed",_on_health);hero.connect("ability_changed",_on_ability)
+	_spawn_breakables()
 	_start_wave(1)
 
 func _start_wave(number:int)->void:
@@ -139,6 +148,8 @@ func _start_wave(number:int)->void:
 			await get_tree().create_timer(.28).timeout
 			_spawn_enemy(i%min(number+1,3),Vector3(randf_range(-10,10),0,randf_range(-6,-1)))
 	elif number==3:
+		_start_puzzle()
+	elif number==4:
 		gates_spawned=true;objective.text="DESTROY THE THREE MONSTER GATES"
 		for pos in [Vector3(-8,0,-5),Vector3(8,0,-5),Vector3(0,0,-3)]:
 			var gate:=Node3D.new();gate.set_script(SPAWNER);add_child(gate);gate.position=pos
@@ -150,6 +161,43 @@ func _spawn_enemy(kind:int,pos:Vector3,elite:=false)->void:
 func _spawn_boss()->void:
 	if boss_spawned:return
 	boss_spawned=true;objective.text="THE CRYPT WARDEN  //  SLAY THE BOSS";_spawn_enemy(3,Vector3(0,0,-5))
+
+func _spawn_breakables()->void:
+	for i in 10:
+		var item:=Node3D.new();item.set_script(BREAKABLE);item.call("setup",i%2);add_child(item)
+		var side:float=-1.0 if i%2==0 else 1.0
+		item.position=Vector3(side*(9.2+(i%3)*.85),0,-6.3+(i/2)*2.5)
+	for pos in [Vector3(-5.2,0,1.4),Vector3(-1.8,0,1.4),Vector3(1.8,0,1.4),Vector3(5.2,0,1.4)]:
+		var trap:=Node3D.new();trap.set_script(TRAP);add_child(trap);trap.position=pos
+
+func breakable_destroyed(pos:Vector3)->void:
+	score+=100;score_label.text="%06d"%score
+	if randf()<.7:
+		var drop:=Node3D.new();drop.set_script(PICKUP);drop.call("setup",0 if randf()<.45 else 1);add_child(drop);drop.global_position=pos
+
+func collect_treasure(value:int)->void:
+	score+=value;score_label.text="%06d"%score
+
+func _start_puzzle()->void:
+	puzzle_active=true;rune_progress=0;objective.text="RUNE LOCK  //  STEP ON 1 • 2 • 3"
+	var positions=[Vector3(-3.3,0,-3.9),Vector3(0,0,-5.1),Vector3(3.3,0,-3.9)]
+	for i in 3:
+		var rune:=Node3D.new();rune.set_script(RUNE);rune.call("setup",i);add_child(rune);rune.position=positions[i];rune.connect("stepped",_on_rune_stepped);rune_nodes.append(rune)
+
+func _on_rune_stepped(index:int)->void:
+	if not puzzle_active:return
+	if index==rune_progress:
+		rune_nodes[index].call("set_lit",true);rune_progress+=1
+		objective.text="RUNE LOCK  //  %d OF 3 ALIGNED"%rune_progress
+		if rune_progress>=3:
+			puzzle_active=false;puzzle_complete=true;score+=750;score_label.text="%06d"%score;objective.text="RUNE LOCK OPEN"
+			await get_tree().create_timer(1.2).timeout
+			for rune in rune_nodes:
+				if is_instance_valid(rune):rune.queue_free()
+			rune_nodes.clear();_start_wave(4)
+	else:
+		rune_progress=0;objective.text="WRONG RUNE  //  SEQUENCE RESET"
+		for rune in rune_nodes:rune.call("set_lit",false)
 
 func enemy_defeated(kind:int)->void:
 	score+=250 if kind<3 else 2500;score_label.text="%06d" % score
@@ -163,7 +211,7 @@ func _process(_delta:float)->void:
 	if game_started and gates_spawned and not boss_spawned:
 		var gates:=get_tree().get_nodes_in_group("gate")
 		objective.text="DESTROY THE MONSTER GATES  //  %d REMAIN"%gates.size()
-		if gates.is_empty():gates_spawned=false;await get_tree().create_timer(1.0).timeout;_start_wave(4)
+		if gates.is_empty():gates_spawned=false;await get_tree().create_timer(1.0).timeout;_start_wave(5)
 	if game_started and Input.is_action_just_pressed("ui_cancel"):
 		if menu.visible:_resume()
 		else:_pause()

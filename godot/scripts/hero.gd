@@ -167,3 +167,6 @@ func take_damage(amount:float,push:Vector3)->void:
 	var tw:=create_tween();tw.tween_property(self,"scale",Vector3(1.15,.85,1.15),.06);tw.tween_property(self,"scale",Vector3.ONE,.12)
 	if health<=0:
 		global_position=Vector3(0,0,6);health=max_health;health_changed.emit(health,max_health)
+
+func heal(amount:float)->void:
+	health=min(max_health,health+amount);health_changed.emit(health,max_health);_burst(Color("#e84f49"),1.8)
