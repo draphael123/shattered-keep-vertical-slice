@@ -69,18 +69,18 @@ func _build_environment()->void:
 	camera=Camera3D.new();camera.position=Vector3(0,17,16);camera.rotation_degrees=Vector3(-47,0,0);camera.fov=40;camera.current=true;add_child(camera)
 
 func _build_arena()->void:
-	var wall:=material(Color("#30453d"));box_part("Floor",Vector3(26,.35,56),Vector3(0,-.2,-18),material(Color("#182d23")),true)
+	var wall:=material(Color("#30453d"));box_part("Floor",Vector3(26,.35,80),Vector3(0,-.2,-30),material(Color("#182d23")),true)
 	for x in range(-12,13,2):
-		for z in range(-44,9,2):
+		for z in range(-68,9,2):
 			var path_tile:bool=abs(x)<=5
 			var tile_color:Color=Color("#46554b") if path_tile else (Color("#25412f") if (x+z)%4==0 else Color("#203828"))
 			var tile:=box_part("Tile",Vector3(1.82,.08,1.82),Vector3(x,.02,z),material(tile_color))
 			tile.rotation.y=randf_range(-.018,.018)
-	box_part("NorthWall",Vector3(26,3.2,.8),Vector3(0,1.4,-46.2),wall,true)
+	box_part("NorthWall",Vector3(26,3.2,.8),Vector3(0,1.4,-70.2),wall,true)
 	box_part("SouthWallL",Vector3(8,.65,.8),Vector3(-9,.15,9.2),wall,true);box_part("SouthWallR",Vector3(8,.65,.8),Vector3(9,.15,9.2),wall,true)
-	box_part("WestWall",Vector3(.8,3,56),Vector3(-13.1,1.3,-18),wall,true);box_part("EastWall",Vector3(.8,3,56),Vector3(13.1,1.3,-18),wall,true)
+	box_part("WestWall",Vector3(.8,3,80),Vector3(-13.1,1.3,-30),wall,true);box_part("EastWall",Vector3(.8,3,80),Vector3(13.1,1.3,-30),wall,true)
 	# Room dividers leave a broad central archway and make progression legible.
-	for z in [-8.0,-20.0,-34.0]:
+	for z in [-8.0,-20.0,-34.0,-48.0,-58.0]:
 		box_part("DividerL",Vector3(8.8,3,.8),Vector3(-8.6,1.3,z),wall,true)
 		box_part("DividerR",Vector3(8.8,3,.8),Vector3(8.6,1.3,z),wall,true)
 		for x in [-4.0,4.0]:
@@ -95,7 +95,7 @@ func _build_arena()->void:
 	# Raised focal dais in the final boss chamber.
 	for i in 3:
 		var ring:=CylinderMesh.new();ring.top_radius=2.8-i*.35;ring.bottom_radius=2.8-i*.35;ring.height=.12
-		var n:=MeshInstance3D.new();n.mesh=ring;n.material_override=material(Color("#263b3a"));n.position=Vector3(0,.03+i*.1,-41);add_child(n)
+		var n:=MeshInstance3D.new();n.mesh=ring;n.material_override=material(Color("#263b3a"));n.position=Vector3(0,.03+i*.1,-64);add_child(n)
 	# Repeated arches, rubble and banners create a consistent authored route.
 	for z in [4.0,-12.0,-26.0,-40.0]:
 		for x in [-11.4,11.4]:
@@ -110,7 +110,7 @@ func _build_arena()->void:
 			var tomb:=box_part("Sarcophagus",Vector3(2.2,.75,1.15),Vector3(x,.35,z),material(Color("#435655")))
 			tomb.rotation.y=PI/2
 			box_part("TombLid",Vector3(1.85,.16,.92),Vector3(x,.8,z),material(Color("#64706b")))
-	for z in range(-43,8,4):
+	for z in range(-67,8,4):
 		for x in [-11.6,-9.8,9.8,11.6]:
 			_tree(Vector3(x+randf_range(-.45,.45),0,z+randf_range(-.8,.8)),randf_range(.8,1.3))
 	for pos in [Vector3(-7,0,3),Vector3(7,0,1),Vector3(-7,0,-11),Vector3(7,0,-18),Vector3(-7,0,-27),Vector3(7,0,-36)]:
@@ -156,19 +156,21 @@ func _build_ui()->void:
 	menu=Control.new();menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);layer.add_child(menu)
 	hud=Control.new();hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);hud.visible=false;layer.add_child(hud)
 	var shade:=ColorRect.new();shade.color=Color(0.015,.027,.032,.86);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);menu.add_child(shade)
-	var top:=Label.new();top.text="THE SHATTERED KEEP";top.position=Vector2(34,24);top.add_theme_font_size_override("font_size",20);top.modulate=Color("#e7ddc8");hud.add_child(top)
-	hero_label=Label.new();hero_label.position=Vector2(34,98);hero_label.size=Vector2(310,24);hero_label.modulate=Color("#9bd9c2");hero_label.add_theme_font_size_override("font_size",13);hud.add_child(hero_label)
-	health_bar=ProgressBar.new();health_bar.position=Vector2(34,58);health_bar.size=Vector2(300,20);health_bar.show_percentage=false;hud.add_child(health_bar)
-	ability_bar=ProgressBar.new();ability_bar.position=Vector2(34,83);ability_bar.size=Vector2(210,8);ability_bar.show_percentage=false;hud.add_child(ability_bar)
+	var hud_frame:=Panel.new();hud_frame.position=Vector2(18,584);hud_frame.size=Vector2(1244,124);var frame_style:=StyleBoxFlat.new();frame_style.bg_color=Color("#111a19ee");frame_style.border_color=Color("#8b7044");frame_style.set_border_width_all(3);frame_style.corner_radius_top_left=12;frame_style.corner_radius_top_right=12;hud_frame.add_theme_stylebox_override("panel",frame_style);hud.add_child(hud_frame)
+	var portrait:=Panel.new();portrait.position=Vector2(34,598);portrait.size=Vector2(84,84);var portrait_style:=StyleBoxFlat.new();portrait_style.bg_color=Color("#243b36");portrait_style.border_color=Color("#c4a45e");portrait_style.set_border_width_all(3);portrait_style.corner_radius_top_left=42;portrait_style.corner_radius_top_right=42;portrait_style.corner_radius_bottom_left=42;portrait_style.corner_radius_bottom_right=42;portrait.add_theme_stylebox_override("panel",portrait_style);hud.add_child(portrait)
+	var top:=Label.new();top.text="SK";top.position=Vector2(34,618);top.size=Vector2(84,44);top.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;top.add_theme_font_size_override("font_size",27);top.modulate=Color("#e7ddc8");hud.add_child(top)
+	hero_label=Label.new();hero_label.position=Vector2(136,603);hero_label.size=Vector2(310,24);hero_label.modulate=Color("#e4d7b8");hero_label.add_theme_font_size_override("font_size",15);hud.add_child(hero_label)
+	health_bar=ProgressBar.new();health_bar.position=Vector2(136,635);health_bar.size=Vector2(310,18);health_bar.show_percentage=false;hud.add_child(health_bar)
+	ability_bar=ProgressBar.new();ability_bar.position=Vector2(136,661);ability_bar.size=Vector2(250,10);ability_bar.show_percentage=false;hud.add_child(ability_bar)
 	var bar_bg:=StyleBoxFlat.new();bar_bg.bg_color=Color("#101d20");bar_bg.corner_radius_top_left=3;bar_bg.corner_radius_top_right=3;bar_bg.corner_radius_bottom_left=3;bar_bg.corner_radius_bottom_right=3
 	var health_fill:=StyleBoxFlat.new();health_fill.bg_color=Color("#c34c45");health_fill.corner_radius_top_left=3;health_fill.corner_radius_top_right=3;health_fill.corner_radius_bottom_left=3;health_fill.corner_radius_bottom_right=3
 	var power_fill:=StyleBoxFlat.new();power_fill.bg_color=Color("#54c9bf");power_fill.corner_radius_top_left=3;power_fill.corner_radius_top_right=3;power_fill.corner_radius_bottom_left=3;power_fill.corner_radius_bottom_right=3
 	health_bar.add_theme_stylebox_override("background",bar_bg);health_bar.add_theme_stylebox_override("fill",health_fill)
 	ability_bar.add_theme_stylebox_override("background",bar_bg);ability_bar.add_theme_stylebox_override("fill",power_fill)
-	objective=Label.new();objective.position=Vector2(760,32);objective.size=Vector2(480,44);objective.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;objective.add_theme_font_size_override("font_size",16);hud.add_child(objective)
-	score_label=Label.new();score_label.position=Vector2(820,68);score_label.size=Vector2(420,30);score_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;score_label.modulate=Color("#f4ca71");hud.add_child(score_label)
-	var controls:=Label.new();controls.text="MOVE  WASD / STICK     ATTACK  LMB / A     POWER  Q / X     DASH  SHIFT / B     PAUSE  ESC";controls.position=Vector2(284,680);controls.modulate=Color("#a5b8b3");controls.add_theme_font_size_override("font_size",12);hud.add_child(controls)
-	tutorial_panel=ColorRect.new();tutorial_panel.position=Vector2(350,545);tutorial_panel.size=Vector2(580,92);tutorial_panel.color=Color("#10231ee8");tutorial_panel.visible=false;hud.add_child(tutorial_panel)
+	objective=Label.new();objective.position=Vector2(690,24);objective.size=Vector2(550,44);objective.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;objective.add_theme_font_size_override("font_size",17);objective.modulate=Color("#f0dfb4");hud.add_child(objective)
+	score_label=Label.new();score_label.position=Vector2(720,622);score_label.size=Vector2(500,30);score_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;score_label.modulate=Color("#f4ca71");hud.add_child(score_label)
+	var controls:=Label.new();controls.text="MOVE  WASD / STICK     ATTACK  LMB / A     POWER  Q / X     DASH  SHIFT / B";controls.position=Vector2(650,669);controls.size=Vector2(570,20);controls.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;controls.modulate=Color("#a5b8b3");controls.add_theme_font_size_override("font_size",11);hud.add_child(controls)
+	tutorial_panel=ColorRect.new();tutorial_panel.position=Vector2(350,474);tutorial_panel.size=Vector2(580,92);tutorial_panel.color=Color("#10231ee8");tutorial_panel.visible=false;hud.add_child(tutorial_panel)
 	tutorial_label=Label.new();tutorial_label.position=Vector2(22,14);tutorial_label.size=Vector2(536,66);tutorial_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;tutorial_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;tutorial_label.add_theme_font_size_override("font_size",17);tutorial_label.modulate=Color("#e8e0bd");tutorial_panel.add_child(tutorial_label)
 
 func styled_button(text:String,pos:Vector2,size:Vector2,callable:Callable)->Button:
@@ -246,6 +248,7 @@ func _start_game(which:String)->void:
 	hero=CharacterBody3D.new();hero.set_script(HERO);hero.call("setup",selected_class);add_child(hero);hero.position=Vector3(0,0,6)
 	hero.connect("health_changed",_on_health);hero.connect("ability_changed",_on_ability)
 	hero.connect("impact",_on_impact)
+	hero.connect("died",_game_over)
 	_spawn_breakables()
 	_spawn_route_pickups()
 	if tutorial_mode:
@@ -283,6 +286,11 @@ func _start_wave(number:int)->void:
 		gates_spawned=true;objective.text="DESTROY THE THREE MONSTER GATES"
 		for pos in [Vector3(-8,0,-29),Vector3(8,0,-29),Vector3(0,0,-26)]:
 			var gate:=Node3D.new();gate.set_script(SPAWNER);add_child(gate);gate.position=pos
+	elif number==5:
+		wave_remaining=10;objective.text="WILDERNESS SIEGE  //  %d CREATURES"%wave_remaining
+		for i in wave_remaining:
+			await get_tree().create_timer(.24).timeout
+			_spawn_enemy(2 if i%3==0 else i%2,Vector3(randf_range(-9,9),0,-52+randf_range(-3,3)),i==9)
 	else:_spawn_boss()
 
 func _spawn_enemy(kind:int,pos:Vector3,elite:=false)->void:
@@ -302,7 +310,7 @@ func _spawn_enemy(kind:int,pos:Vector3,elite:=false)->void:
 
 func _spawn_boss()->void:
 	if boss_spawned:return
-	boss_spawned=true;objective.text="THE THORN WARDEN  //  SLAY THE BOSS";_spawn_enemy(3,Vector3(0,0,-41))
+	boss_spawned=true;objective.text="THE THORN WARDEN  //  SLAY THE BOSS";_spawn_enemy(3,Vector3(0,0,-64))
 
 func _spawn_breakables()->void:
 	for i in 10:
@@ -313,7 +321,7 @@ func _spawn_breakables()->void:
 		var trap:=Node3D.new();trap.set_script(TRAP);add_child(trap);trap.position=pos
 
 func _spawn_route_pickups()->void:
-	for data in [[2,Vector3(-6,0,-4)],[0,Vector3(6,0,-12)],[1,Vector3(-7,0,-25)],[3,Vector3(7,0,-38)]]:
+	for data in [[2,Vector3(-6,0,-4)],[0,Vector3(6,0,-12)],[1,Vector3(-7,0,-25)],[3,Vector3(7,0,-38)],[0,Vector3(-7,0,-53)],[1,Vector3(7,0,-61)]]:
 		var drop:=Node3D.new();drop.set_script(PICKUP);drop.call("setup",data[0]);add_child(drop);drop.global_position=data[1]
 
 func breakable_destroyed(pos:Vector3)->void:
@@ -359,10 +367,16 @@ func _on_rune_stepped(index:int)->void:
 func enemy_defeated(kind:int)->void:
 	score+=250 if kind<3 else 2500;_refresh_score()
 	if kind==3:_victory()
-	elif stage<=2:
-		wave_remaining-=1;objective.text=("FIELD AMBUSH" if stage==1 else "HEDGE MAZE")+"  //  %d CREATURES"%max(wave_remaining,0)
+	elif stage in [1,2,5]:
+		wave_remaining-=1
+		var encounter_name:="FIELD AMBUSH" if stage==1 else ("HEDGE MAZE" if stage==2 else "WILDERNESS SIEGE")
+		objective.text=encounter_name+"  //  %d CREATURES"%max(wave_remaining,0)
 		if wave_remaining<=0:
-			pending_stage=stage+1;advance_target_z=-9.0 if pending_stage==2 else -21.0;awaiting_advance=true
+			pending_stage=stage+1
+			if pending_stage==2:advance_target_z=-9.0
+			elif pending_stage==3:advance_target_z=-21.0
+			else:advance_target_z=-59.0
+			awaiting_advance=true
 			objective.text="PATH OPEN  //  ADVANCE TO THE NEXT CHAMBER"
 
 func _process(delta:float)->void:
@@ -417,6 +431,14 @@ func _victory()->void:
 	var reward:=label("+ 1 RELIC SHARD     + FORGE RESTORATION",Vector2(0,285),16,Color("#ddd4c3"));reward.size=Vector2(1280,35);reward.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	var final_score:=label("FINAL SCORE   %06d"%score,Vector2(0,350),24,Color("#f4ca71"));final_score.size=Vector2(1280,40);final_score.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	styled_button("PLAY AGAIN",Vector2(490,465),Vector2(300,52),_quit_run)
+
+func _game_over()->void:
+	game_started=false;await get_tree().create_timer(.35).timeout;menu.visible=true;hud.visible=false;clear_menu()
+	var defeat:=label("YOUR LIGHT FADES",Vector2(0,150),44,Color("#d76455"));defeat.size=Vector2(1280,60);defeat.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	var lesson:=label("The forest remains. Return stronger, or choose a different hero.",Vector2(0,230),17,Color("#c9bea8"));lesson.size=Vector2(1280,32);lesson.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	var run_score:=label("GOLD  %04d     SCORE  %06d"%[gold,score],Vector2(0,300),22,Color("#e6c16f"));run_score.size=Vector2(1280,38);run_score.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	styled_button("TRY AGAIN",Vector2(490,400),Vector2(300,54),_quit_run)
+	styled_button("CHANGE HERO",Vector2(490,470),Vector2(300,48),_quit_run)
 
 func _on_health(current:float,maximum:float)->void:
 	health_bar.max_value=maximum;health_bar.value=current

@@ -3,6 +3,7 @@ extends CharacterBody3D
 signal health_changed(current: float, maximum: float)
 signal ability_changed(current: float, maximum: float)
 signal impact(strength:float)
+signal died
 
 var hero_class := "Ironwarden"
 var health := 150.0
@@ -25,6 +26,7 @@ var left_arm:MeshInstance3D
 var motion_time:=0.0
 var combo_step:=0
 var combo_window:=0.0
+var defeated:=false
 
 func setup(selected: String) -> void:
 	hero_class = selected
@@ -100,6 +102,7 @@ func _build_character() -> void:
 	var col:=CollisionShape3D.new();col.shape=shape;col.position.y=.75;add_child(col)
 
 func _physics_process(delta: float) -> void:
+	if defeated:return
 	attack_cooldown -= delta; ability_cooldown -= delta; dash_cooldown -= delta; invulnerable -= delta
 	combo_window-=delta
 	if combo_window<=0:combo_step=0
@@ -115,7 +118,7 @@ func _physics_process(delta: float) -> void:
 	var stride:=sin(motion_time*2.4)*(.55 if moving else .04)
 	left_leg.rotation.x=stride;right_leg.rotation.x=-stride;left_arm.rotation.x=-stride*.7
 	torso_node.rotation.z=sin(motion_time*2.4)*(.035 if moving else .012)
-	global_position.x=clamp(global_position.x,-11.6,11.6);global_position.z=clamp(global_position.z,-45.0,7.6)
+	global_position.x=clamp(global_position.x,-11.6,11.6);global_position.z=clamp(global_position.z,-69.0,7.6)
 	if Input.is_action_pressed("attack") and attack_cooldown<=0:_attack()
 	if Input.is_action_just_pressed("ability"):_ability()
 	if Input.is_action_just_pressed("dash") and dash_cooldown<=0:
@@ -197,7 +200,9 @@ func take_damage(amount:float,push:Vector3)->void:
 	health=max(0,health-amount);velocity+=push;invulnerable=.38;health_changed.emit(health,max_health)
 	var tw:=create_tween();tw.tween_property(self,"scale",Vector3(1.15,.85,1.15),.06);tw.tween_property(self,"scale",Vector3.ONE,.12)
 	if health<=0:
-		global_position=Vector3(0,0,6);health=max_health;health_changed.emit(health,max_health)
+		defeated=true;remove_from_group("hero")
+		var fall:=create_tween().set_parallel();fall.tween_property(visual_root,"rotation:z",PI/2,.35).set_trans(Tween.TRANS_BACK);fall.tween_property(visual_root,"position:y",.1,.35)
+		await get_tree().create_timer(.55).timeout;died.emit()
 
 func heal(amount:float)->void:
 	health=min(max_health,health+amount);health_changed.emit(health,max_health);_burst(Color("#e84f49"),1.8)
