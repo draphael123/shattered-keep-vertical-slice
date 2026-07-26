@@ -17,6 +17,7 @@ var objective:Label
 var score_label:Label
 var selected_class:="Ironwarden"
 var score:=0
+var gold:=0
 var stage:=0
 var wave_remaining:=0
 var game_started:=false
@@ -31,6 +32,10 @@ var camera:Camera3D
 var awaiting_advance:=false
 var advance_target_z:=0.0
 var pending_stage:=0
+var camera_shake:=0.0
+var screen_shake_enabled:=true
+var damage_flashes_enabled:=true
+var master_volume:=85.0
 
 func _ready()->void:
 	_build_environment();_build_arena();_build_ui();_show_title()
@@ -59,7 +64,8 @@ func _build_arena()->void:
 		for z in range(-44,9,2):
 			var tile:=box_part("Tile",Vector3(1.82,.08,1.82),Vector3(x,.02,z),material(Color("#20383a") if (x+z)%4==0 else Color("#192e30")))
 			tile.rotation.y=randf_range(-.018,.018)
-	box_part("NorthWall",Vector3(26,3.2,.8),Vector3(0,1.4,-46.2),wall,true);box_part("SouthWall",Vector3(26,.65,.8),Vector3(0,.15,9.2),wall,true)
+	box_part("NorthWall",Vector3(26,3.2,.8),Vector3(0,1.4,-46.2),wall,true)
+	box_part("SouthWallL",Vector3(8,.65,.8),Vector3(-9,.15,9.2),wall,true);box_part("SouthWallR",Vector3(8,.65,.8),Vector3(9,.15,9.2),wall,true)
 	box_part("WestWall",Vector3(.8,3,56),Vector3(-13.1,1.3,-18),wall,true);box_part("EastWall",Vector3(.8,3,56),Vector3(13.1,1.3,-18),wall,true)
 	# Room dividers leave a broad central archway and make progression legible.
 	for z in [-8.0,-20.0,-34.0]:
@@ -86,6 +92,12 @@ func _build_arena()->void:
 		for x in [-9.5,9.5]:
 			var rubble:=box_part("Rubble",Vector3(1.4,.65,1.1),Vector3(x,.3,z),material(Color("#314341")))
 			rubble.rotation_degrees=Vector3(randf_range(-8,8),randf_range(0,45),randf_range(-6,6))
+	# Readable spawn furniture: enemies emerge beside these sarcophagi.
+	for z in [-2.0,-14.0,-29.0,-40.0]:
+		for x in [-10.2,10.2]:
+			var tomb:=box_part("Sarcophagus",Vector3(2.2,.75,1.15),Vector3(x,.35,z),material(Color("#435655")))
+			tomb.rotation.y=PI/2
+			box_part("TombLid",Vector3(1.85,.16,.92),Vector3(x,.8,z),material(Color("#64706b")))
 
 func _build_ui()->void:
 	layer=CanvasLayer.new();add_child(layer)
@@ -101,7 +113,7 @@ func _build_ui()->void:
 	health_bar.add_theme_stylebox_override("background",bar_bg);health_bar.add_theme_stylebox_override("fill",health_fill)
 	ability_bar.add_theme_stylebox_override("background",bar_bg);ability_bar.add_theme_stylebox_override("fill",power_fill)
 	objective=Label.new();objective.position=Vector2(760,32);objective.size=Vector2(480,44);objective.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;objective.add_theme_font_size_override("font_size",16);hud.add_child(objective)
-	score_label=Label.new();score_label.position=Vector2(1040,68);score_label.size=Vector2(200,30);score_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;score_label.modulate=Color("#f4ca71");hud.add_child(score_label)
+	score_label=Label.new();score_label.position=Vector2(900,68);score_label.size=Vector2(340,30);score_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;score_label.modulate=Color("#f4ca71");hud.add_child(score_label)
 	var controls:=Label.new();controls.text="MOVE  WASD / STICK     ATTACK  LMB / A     POWER  Q / X     DASH  SHIFT / B     PAUSE  ESC";controls.position=Vector2(284,680);controls.modulate=Color("#a5b8b3");controls.add_theme_font_size_override("font_size",12);hud.add_child(controls)
 
 func styled_button(text:String,pos:Vector2,size:Vector2,callable:Callable)->Button:
@@ -149,9 +161,9 @@ func _show_select()->void:
 func _show_settings()->void:
 	clear_menu();settings_open=true;var settings_heading:=label("SETTINGS",Vector2(0,100),36,Color("#eadfc9"));settings_heading.size=Vector2(1280,50);settings_heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	label("MASTER VOLUME",Vector2(390,210),16,Color("#9eb1ad"))
-	var volume:=HSlider.new();volume.position=Vector2(620,210);volume.size=Vector2(270,30);volume.value=85;menu.add_child(volume)
-	label("SCREEN SHAKE",Vector2(390,275),16,Color("#9eb1ad"));var shake:=CheckButton.new();shake.position=Vector2(780,265);shake.button_pressed=true;menu.add_child(shake)
-	label("DAMAGE FLASHES",Vector2(390,340),16,Color("#9eb1ad"));var flashes:=CheckButton.new();flashes.position=Vector2(780,330);flashes.button_pressed=true;menu.add_child(flashes)
+	var volume:=HSlider.new();volume.position=Vector2(620,210);volume.size=Vector2(270,30);volume.value=master_volume;volume.focus_mode=Control.FOCUS_ALL;volume.value_changed.connect(_set_volume);menu.add_child(volume)
+	label("SCREEN SHAKE",Vector2(390,275),16,Color("#9eb1ad"));var shake:=CheckButton.new();shake.position=Vector2(780,265);shake.button_pressed=screen_shake_enabled;shake.focus_mode=Control.FOCUS_ALL;shake.toggled.connect(func(value):screen_shake_enabled=value);menu.add_child(shake)
+	label("DAMAGE FLASHES",Vector2(390,340),16,Color("#9eb1ad"));var flashes:=CheckButton.new();flashes.position=Vector2(780,330);flashes.button_pressed=damage_flashes_enabled;flashes.focus_mode=Control.FOCUS_ALL;flashes.toggled.connect(func(value):damage_flashes_enabled=value);menu.add_child(flashes)
 	label("CONTROLS",Vector2(390,405),16,Color("#9eb1ad"));label("Keyboard + mouse / Xbox-style controller",Vector2(620,405),15,Color("#e2d9c8"))
 	styled_button("RETURN",Vector2(490,515),Vector2(300,50),_return_from_settings)
 
@@ -159,10 +171,16 @@ func _return_from_settings()->void:
 	if game_started:_resume()
 	else:_show_title()
 
+func _set_volume(value:float)->void:
+	master_volume=value
+	var bus:=AudioServer.get_bus_index("Master")
+	AudioServer.set_bus_volume_db(bus,linear_to_db(max(value/100.0,.001)))
+
 func _start_game(which:String)->void:
-	selected_class=which;clear_menu();menu.visible=false;hud.visible=true;game_started=true;score=0;stage=1
+	selected_class=which;clear_menu();menu.visible=false;hud.visible=true;game_started=true;score=0;gold=0;stage=1;_refresh_score()
 	hero=CharacterBody3D.new();hero.set_script(HERO);hero.call("setup",selected_class);add_child(hero);hero.position=Vector3(0,0,6)
 	hero.connect("health_changed",_on_health);hero.connect("ability_changed",_on_ability)
+	hero.connect("impact",_on_impact)
 	_spawn_breakables()
 	_start_wave(1)
 
@@ -183,7 +201,13 @@ func _start_wave(number:int)->void:
 	else:_spawn_boss()
 
 func _spawn_enemy(kind:int,pos:Vector3,elite:=false)->void:
+	var warning:=MeshInstance3D.new();var wm:=CylinderMesh.new();wm.top_radius=.7;wm.bottom_radius=.7;wm.height=.03
+	warning.mesh=wm;warning.material_override=material(Color("#4bd5ca"),Color("#4bd5ca"),2.6);warning.position=pos+Vector3(0,.04,0);add_child(warning)
+	var telegraph:=create_tween().set_parallel();warning.scale=Vector3(.15,.15,.15);telegraph.tween_property(warning,"scale",Vector3.ONE,0.38);telegraph.tween_property(warning,"transparency",1.0,.5)
+	await get_tree().create_timer(.42).timeout
 	var enemy:=CharacterBody3D.new();enemy.set_script(ENEMY);enemy.call("setup",kind,elite);add_child(enemy);enemy.global_position=pos
+	enemy.scale=Vector3(.2,.2,.2);var rise:=create_tween();rise.tween_property(enemy,"scale",Vector3.ONE*1.65 if kind==3 else Vector3.ONE,0.25).set_trans(Tween.TRANS_BACK)
+	warning.queue_free()
 
 func _spawn_boss()->void:
 	if boss_spawned:return
@@ -198,12 +222,18 @@ func _spawn_breakables()->void:
 		var trap:=Node3D.new();trap.set_script(TRAP);add_child(trap);trap.position=pos
 
 func breakable_destroyed(pos:Vector3)->void:
-	score+=100;score_label.text="%06d"%score
+	score+=100;_refresh_score()
 	if randf()<.7:
-		var drop:=Node3D.new();drop.set_script(PICKUP);drop.call("setup",0 if randf()<.45 else 1);add_child(drop);drop.global_position=pos
+		var health_drop:=randf()<.32
+		var count:=1 if health_drop else randi_range(3,6)
+		for i in count:
+			var drop:=Node3D.new();drop.set_script(PICKUP);drop.call("setup",0 if health_drop else 1);add_child(drop);drop.global_position=pos+Vector3(randf_range(-.2,.2),.1,randf_range(-.2,.2))
 
 func collect_treasure(value:int)->void:
-	score+=value;score_label.text="%06d"%score
+	gold+=value;score+=value*10;_refresh_score()
+
+func _refresh_score()->void:
+	if score_label:score_label.text="GOLD  %04d     SCORE  %06d"%[gold,score]
 
 func _start_puzzle()->void:
 	puzzle_active=true;rune_progress=0;objective.text="RUNE LOCK  //  STEP ON 1 • 2 • 3"
@@ -217,7 +247,7 @@ func _on_rune_stepped(index:int)->void:
 		rune_nodes[index].call("set_lit",true);rune_progress+=1
 		objective.text="RUNE LOCK  //  %d OF 3 ALIGNED"%rune_progress
 		if rune_progress>=3:
-			puzzle_active=false;puzzle_complete=true;score+=750;score_label.text="%06d"%score;objective.text="RUNE LOCK OPEN"
+			puzzle_active=false;puzzle_complete=true;score+=750;_refresh_score();objective.text="RUNE LOCK OPEN"
 			await get_tree().create_timer(1.2).timeout
 			for rune in rune_nodes:
 				if is_instance_valid(rune):rune.queue_free()
@@ -227,7 +257,7 @@ func _on_rune_stepped(index:int)->void:
 		for rune in rune_nodes:rune.call("set_lit",false)
 
 func enemy_defeated(kind:int)->void:
-	score+=250 if kind<3 else 2500;score_label.text="%06d" % score
+	score+=250 if kind<3 else 2500;_refresh_score()
 	if kind==3:_victory()
 	elif stage<=2:
 		wave_remaining-=1;objective.text="WAVE %d  //  %d CREATURES" %[stage,max(wave_remaining,0)]
@@ -238,7 +268,10 @@ func enemy_defeated(kind:int)->void:
 func _process(delta:float)->void:
 	if game_started and is_instance_valid(hero) and is_instance_valid(camera):
 		var desired:=Vector3(clamp(hero.global_position.x*.18,-2.2,2.2),17,hero.global_position.z+16)
-		camera.global_position=camera.global_position.lerp(desired,1.0-exp(-delta*4.5))
+		camera_shake=max(0.0,camera_shake-delta*3.0)
+		var amount:=camera_shake if screen_shake_enabled else 0.0
+		var shake:=Vector3(randf_range(-amount,amount),randf_range(-amount,amount),0)
+		camera.global_position=camera.global_position.lerp(desired+shake,1.0-exp(-delta*4.5))
 	if awaiting_advance and is_instance_valid(hero) and hero.global_position.z<advance_target_z:
 		awaiting_advance=false;_start_wave(pending_stage)
 	if game_started and gates_spawned and not boss_spawned:
@@ -272,3 +305,6 @@ func _on_health(current:float,maximum:float)->void:
 	health_bar.max_value=maximum;health_bar.value=current
 func _on_ability(current:float,maximum:float)->void:
 	ability_bar.max_value=maximum;ability_bar.value=maximum-current
+
+func _on_impact(strength:float)->void:
+	camera_shake=max(camera_shake,strength)

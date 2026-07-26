@@ -11,6 +11,8 @@ var body:MeshInstance3D
 var tell:MeshInstance3D
 var dead:=false
 var elite:=false
+var visual_root:Node3D
+var walk_time:=0.0
 
 func setup(kind:int,is_elite:=false)->void:
 	enemy_type=kind;elite=is_elite
@@ -26,12 +28,13 @@ func material(color:Color,emission:=Color.BLACK,energy:=0.0)->StandardMaterial3D
 	return m
 
 func add_part(mesh:PrimitiveMesh,mat:Material,pos:Vector3,rot:=Vector3.ZERO)->MeshInstance3D:
-	var n:=MeshInstance3D.new();n.mesh=mesh;n.material_override=mat;n.position=pos;n.rotation=rot;add_child(n);return n
+	var n:=MeshInstance3D.new();n.mesh=mesh;n.material_override=mat;n.position=pos;n.rotation=rot;(visual_root if is_instance_valid(visual_root) else self).add_child(n);return n
 
 func _ready()->void:
 	add_to_group("damageable");hero=get_tree().get_first_node_in_group("hero");_build()
 
 func _build()->void:
+	visual_root=Node3D.new();add_child(visual_root)
 	var colors=[Color("#aab9ad"),Color("#6ea64e"),Color("#855d9e"),Color("#71384b")]
 	var accents=[Color("#53ddcf"),Color("#d8ec77"),Color("#ba75f5"),Color("#ff594d")]
 	var c:Color=colors[enemy_type];var glow:=material(accents[enemy_type],accents[enemy_type],2.8)
@@ -74,10 +77,13 @@ func _physics_process(delta:float)->void:
 	elif dist<(2.2 if enemy_type==3 else 1.65) and attack_cooldown<=0:attack_timer=.52
 	elif dist>1.35:
 		velocity=off.normalized()*speed;rotation.y=atan2(-off.x,-off.z);move_and_slide()
+		walk_time+=delta*speed*2.4;visual_root.position.y=abs(sin(walk_time))*.09;visual_root.rotation.z=sin(walk_time)*.045
 
 func take_damage(amount:float,push:Vector3)->void:
 	if dead:return
 	health-=amount;velocity+=push
+	var number:=Label3D.new();number.text=str(int(amount));number.font_size=38;number.modulate=Color("#fff0b0");number.outline_size=8;number.position=Vector3(0,2.2,0);add_child(number)
+	var float_up:=create_tween().set_parallel();float_up.tween_property(number,"position:y",3.0,.42);float_up.tween_property(number,"modulate:a",0.0,.42);float_up.chain().tween_callback(number.queue_free)
 	var tw:=create_tween();tw.tween_property(body,"scale",Vector3(1.25,.72,1.25),.05);tw.tween_property(body,"scale",Vector3.ONE,.1)
 	if health<=0:
 		dead=true;remove_from_group("damageable")
