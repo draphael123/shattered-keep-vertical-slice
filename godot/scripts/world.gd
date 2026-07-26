@@ -15,11 +15,13 @@ var health_bar:ProgressBar
 var ability_bar:ProgressBar
 var objective:Label
 var score_label:Label
+var hero_label:Label
 var tutorial_panel:ColorRect
 var tutorial_label:Label
 var selected_class:="Ironwarden"
 var score:=0
 var gold:=0
+var keys:=0
 var stage:=0
 var wave_remaining:=0
 var game_started:=false
@@ -132,6 +134,7 @@ func _build_ui()->void:
 	hud=Control.new();hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);hud.visible=false;layer.add_child(hud)
 	var shade:=ColorRect.new();shade.color=Color(0.015,.027,.032,.86);shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);menu.add_child(shade)
 	var top:=Label.new();top.text="THE SHATTERED KEEP";top.position=Vector2(34,24);top.add_theme_font_size_override("font_size",20);top.modulate=Color("#e7ddc8");hud.add_child(top)
+	hero_label=Label.new();hero_label.position=Vector2(34,98);hero_label.size=Vector2(310,24);hero_label.modulate=Color("#9bd9c2");hero_label.add_theme_font_size_override("font_size",13);hud.add_child(hero_label)
 	health_bar=ProgressBar.new();health_bar.position=Vector2(34,58);health_bar.size=Vector2(300,20);health_bar.show_percentage=false;hud.add_child(health_bar)
 	ability_bar=ProgressBar.new();ability_bar.position=Vector2(34,83);ability_bar.size=Vector2(210,8);ability_bar.show_percentage=false;hud.add_child(ability_bar)
 	var bar_bg:=StyleBoxFlat.new();bar_bg.bg_color=Color("#101d20");bar_bg.corner_radius_top_left=3;bar_bg.corner_radius_top_right=3;bar_bg.corner_radius_bottom_left=3;bar_bg.corner_radius_bottom_right=3
@@ -140,7 +143,7 @@ func _build_ui()->void:
 	health_bar.add_theme_stylebox_override("background",bar_bg);health_bar.add_theme_stylebox_override("fill",health_fill)
 	ability_bar.add_theme_stylebox_override("background",bar_bg);ability_bar.add_theme_stylebox_override("fill",power_fill)
 	objective=Label.new();objective.position=Vector2(760,32);objective.size=Vector2(480,44);objective.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;objective.add_theme_font_size_override("font_size",16);hud.add_child(objective)
-	score_label=Label.new();score_label.position=Vector2(900,68);score_label.size=Vector2(340,30);score_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;score_label.modulate=Color("#f4ca71");hud.add_child(score_label)
+	score_label=Label.new();score_label.position=Vector2(820,68);score_label.size=Vector2(420,30);score_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;score_label.modulate=Color("#f4ca71");hud.add_child(score_label)
 	var controls:=Label.new();controls.text="MOVE  WASD / STICK     ATTACK  LMB / A     POWER  Q / X     DASH  SHIFT / B     PAUSE  ESC";controls.position=Vector2(284,680);controls.modulate=Color("#a5b8b3");controls.add_theme_font_size_override("font_size",12);hud.add_child(controls)
 	tutorial_panel=ColorRect.new();tutorial_panel.position=Vector2(350,545);tutorial_panel.size=Vector2(580,92);tutorial_panel.color=Color("#10231ee8");tutorial_panel.visible=false;hud.add_child(tutorial_panel)
 	tutorial_label=Label.new();tutorial_label.position=Vector2(22,14);tutorial_label.size=Vector2(536,66);tutorial_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;tutorial_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;tutorial_label.add_theme_font_size_override("font_size",17);tutorial_label.modulate=Color("#e8e0bd");tutorial_panel.add_child(tutorial_label)
@@ -176,17 +179,25 @@ func _show_title()->void:
 	var foot:=label("A  G A U N T L E T - S T Y L E   A R C A D E   A D V E N T U R E",Vector2(0,600),11,Color("#687b78"));foot.size=Vector2(1280,20);foot.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 
 func _show_select()->void:
-	clear_menu();var heading:=label("CHOOSE YOUR HERO",Vector2(0,62),34,Color("#eadfc9"));heading.size=Vector2(1280,50);heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-	var subtitle:=label("Each hero has a distinct rhythm, power, and role.",Vector2(0,110),15,Color("#92a7a3"));subtitle.size=Vector2(1280,30);subtitle.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	clear_menu();var heading:=label("CHOOSE YOUR HERO",Vector2(0,38),34,Color("#eadfc9"));heading.size=Vector2(1280,50);heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	var subtitle:=label("Four distinct roles. Compare ratings, choose a weapon, and enter the wild road.",Vector2(0,84),15,Color("#92a7a3"));subtitle.size=Vector2(1280,30);subtitle.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	var classes=[["IRONWARDEN","Shield burst • durable","#63d5ca"],["EMBER MAGE","Fire nova • ranged","#ff7045"],["WILDBOW","Arrow volley • swift","#9bd65b"],["DAWN CLERIC","Heal pulse • balanced","#ffd77a"]]
 	for i in 4:
-		var x=82+i*300;var card:=ColorRect.new();card.position=Vector2(x,180);card.size=Vector2(260,320);card.color=Color(classes[i][2]).darkened(.72);menu.add_child(card)
-		var icon:=label(["IW","EM","WB","DC"][i],Vector2(x,220),42,Color(classes[i][2]));icon.size=Vector2(260,65);icon.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-		var name:=label(classes[i][0],Vector2(x,305),21,Color("#eee4d3"));name.size=Vector2(260,30);name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-		var desc:=label(classes[i][1],Vector2(x,348),13,Color("#b4c2bd"));desc.size=Vector2(260,28);desc.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+		var x=82+i*300;var card:=ColorRect.new();card.position=Vector2(x,130);card.size=Vector2(260,440);card.color=Color(classes[i][2]).darkened(.72);menu.add_child(card)
+		var icon:=label(["IW","EM","WB","DC"][i],Vector2(x,151),38,Color(classes[i][2]));icon.size=Vector2(260,55);icon.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+		var name:=label(classes[i][0],Vector2(x,211),20,Color("#eee4d3"));name.size=Vector2(260,30);name.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+		var desc:=label(classes[i][1],Vector2(x,247),13,Color("#b4c2bd"));desc.size=Vector2(260,28);desc.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+		var ratings=[[4,5,2,2],[3,1,3,5],[4,2,5,2],[3,4,2,4]][i]
+		var weapons=["SWORD + SHIELD","FIRE STAFF","LONGBOW","SUN MACE"]
+		var weapon:=label(weapons[i],Vector2(x,282),13,Color("#d7c999"));weapon.size=Vector2(260,22);weapon.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+		var stat_text:="DAMAGE   %s\nARMOR     %s\nSPEED     %s\nMAGIC     %s"%[_rating(ratings[0]),_rating(ratings[1]),_rating(ratings[2]),_rating(ratings[3])]
+		var stat_label:=label(stat_text,Vector2(x+30,319),13,Color("#d7ded5"));stat_label.size=Vector2(205,116);stat_label.add_theme_constant_override("line_spacing",7)
 		var hero_choice:String=["Ironwarden","Ember Mage","Wildbow","Dawn Cleric"][i]
-		var b:=styled_button("SELECT",Vector2(x+40,420),Vector2(180,48),func():_start_game(hero_choice));b.add_theme_color_override("font_color",Color(classes[i][2]))
+		var b:=styled_button("SELECT",Vector2(x+40,496),Vector2(180,48),func():_start_game(hero_choice));b.add_theme_color_override("font_color",Color(classes[i][2]))
 	styled_button("BACK",Vector2(40,635),Vector2(150,42),_show_title)
+
+func _rating(value:int)->String:
+	return "#".repeat(value)+"-".repeat(5-value)
 
 func _show_settings()->void:
 	clear_menu();settings_open=true;var settings_heading:=label("SETTINGS",Vector2(0,100),36,Color("#eadfc9"));settings_heading.size=Vector2(1280,50);settings_heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
@@ -207,11 +218,13 @@ func _set_volume(value:float)->void:
 	AudioServer.set_bus_volume_db(bus,linear_to_db(max(value/100.0,.001)))
 
 func _start_game(which:String)->void:
-	selected_class=which;clear_menu();menu.visible=false;hud.visible=true;game_started=true;score=0;gold=0;stage=1;_refresh_score()
+	selected_class=which;clear_menu();menu.visible=false;hud.visible=true;game_started=true;score=0;gold=0;keys=0;stage=1;_refresh_score()
+	hero_label.text=selected_class.to_upper()+"  //  LEVEL 1"
 	hero=CharacterBody3D.new();hero.set_script(HERO);hero.call("setup",selected_class);add_child(hero);hero.position=Vector3(0,0,6)
 	hero.connect("health_changed",_on_health);hero.connect("ability_changed",_on_ability)
 	hero.connect("impact",_on_impact)
 	_spawn_breakables()
+	_spawn_route_pickups()
 	if tutorial_mode:
 		tutorial_step=0;tutorial_origin=hero.global_position;tutorial_attacks=0;tutorial_panel.visible=true
 		objective.text="TRAIL LESSON  //  MOVEMENT";_set_tutorial("MOVE\nUse WASD or the left stick to cross the glowing trail.")
@@ -275,6 +288,10 @@ func _spawn_breakables()->void:
 	for pos in [Vector3(-5.2,0,-16),Vector3(-1.8,0,-16),Vector3(1.8,0,-16),Vector3(5.2,0,-16)]:
 		var trap:=Node3D.new();trap.set_script(TRAP);add_child(trap);trap.position=pos
 
+func _spawn_route_pickups()->void:
+	for data in [[2,Vector3(-6,0,-4)],[0,Vector3(6,0,-12)],[1,Vector3(-7,0,-25)],[3,Vector3(7,0,-38)]]:
+		var drop:=Node3D.new();drop.set_script(PICKUP);drop.call("setup",data[0]);add_child(drop);drop.global_position=data[1]
+
 func breakable_destroyed(pos:Vector3)->void:
 	score+=100;_refresh_score()
 	if tutorial_mode and tutorial_step==4:_advance_tutorial()
@@ -287,8 +304,12 @@ func breakable_destroyed(pos:Vector3)->void:
 func collect_treasure(value:int)->void:
 	gold+=value;score+=value*10;_refresh_score()
 
+func collect_key()->void:
+	keys+=1;score+=300;_refresh_score()
+	objective.text="IRON KEY FOUND  //  LOCKED GATES CAN BE OPENED"
+
 func _refresh_score()->void:
-	if score_label:score_label.text="GOLD  %04d     SCORE  %06d"%[gold,score]
+	if score_label:score_label.text="KEYS  %d     GOLD  %04d     SCORE  %06d"%[keys,gold,score]
 
 func _start_puzzle()->void:
 	puzzle_active=true;rune_progress=0;objective.text="RUNE LOCK  //  STEP ON 1 • 2 • 3"
@@ -336,7 +357,11 @@ func _process(delta:float)->void:
 			elif tutorial_step==2 and Input.is_action_just_pressed("ability"):_advance_tutorial()
 			elif tutorial_step==3 and Input.is_action_just_pressed("dash"):_advance_tutorial()
 	if awaiting_advance and is_instance_valid(hero) and hero.global_position.z<advance_target_z:
-		awaiting_advance=false;_start_wave(pending_stage)
+		if pending_stage==2 and keys<=0:
+			hero.global_position.z=advance_target_z+.5;objective.text="LOCKED GATE  //  FIND THE IRON KEY"
+		else:
+			if pending_stage==2:keys-=1;_refresh_score()
+			awaiting_advance=false;_start_wave(pending_stage)
 	if game_started and gates_spawned and not boss_spawned:
 		var gates:=get_tree().get_nodes_in_group("gate")
 		objective.text="DESTROY THE MONSTER GATES  //  %d REMAIN"%gates.size()

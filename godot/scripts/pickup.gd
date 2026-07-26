@@ -13,9 +13,16 @@ func _ready()->void:
 	mesh_node=MeshInstance3D.new()
 	if pickup_type==0:
 		var mesh:=SphereMesh.new();mesh.radius=.24;mesh.height=.48;mesh_node.mesh=mesh
-	else:
+	elif pickup_type==1:
 		var mesh:=CylinderMesh.new();mesh.top_radius=.2;mesh.bottom_radius=.2;mesh.height=.08;mesh_node.mesh=mesh
-	var mat:=StandardMaterial3D.new();var color:=Color("#e84f49") if pickup_type==0 else Color("#f2cb5f")
+	elif pickup_type==2:
+		var mesh:=TorusMesh.new();mesh.inner_radius=.13;mesh.outer_radius=.24;mesh_node.mesh=mesh
+		var tooth:=BoxMesh.new();tooth.size=Vector3(.12,.42,.1)
+		var tooth_node:=MeshInstance3D.new();tooth_node.mesh=tooth;tooth_node.position=Vector3(.25,.12,0);mesh_node.add_child(tooth_node)
+	else:
+		var mesh:=PrismMesh.new();mesh.size=Vector3(.42,.5,.18);mesh_node.mesh=mesh
+	var colors=[Color("#e84f49"),Color("#f2cb5f"),Color("#8ee8f0"),Color("#c57cff")]
+	var mat:=StandardMaterial3D.new();var color:Color=colors[pickup_type]
 	mat.albedo_color=color;mat.emission_enabled=true;mat.emission=color;mat.emission_energy_multiplier=2.2
 	mesh_node.material_override=mat;mesh_node.position.y=.45;add_child(mesh_node)
 	velocity=Vector3(randf_range(-2.4,2.4),randf_range(2.2,3.8),randf_range(-2.4,2.4))
@@ -31,5 +38,9 @@ func _process(delta:float)->void:
 		if distance<3.0:global_position=global_position.lerp(hero.global_position,delta*(7.0 if distance<1.5 else 3.0))
 	if is_instance_valid(hero) and hero.global_position.distance_to(global_position)<.85:
 		if pickup_type==0:hero.call("heal",25.0)
-		elif get_parent().has_method("collect_treasure"):get_parent().call("collect_treasure",25)
+		elif pickup_type==1 and get_parent().has_method("collect_treasure"):get_parent().call("collect_treasure",25)
+		elif pickup_type==2 and get_parent().has_method("collect_key"):get_parent().call("collect_key")
+		elif pickup_type==3:
+			hero.call("heal",50.0)
+			if get_parent().has_method("collect_treasure"):get_parent().call("collect_treasure",100)
 		queue_free()
