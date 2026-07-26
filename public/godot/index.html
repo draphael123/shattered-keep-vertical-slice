@@ -121,11 +121,13 @@ window.fetch = async (resource, options) => {
 				return response.arrayBuffer();
 			})
 		));
-		return new Response(new Blob(parts, { type: 'application/wasm' }), { headers: { 'Content-Type': 'application/wasm' } });
+		return new Response(new Blob(parts, { type: 'application/wasm' }), {
+			headers: { 'Content-Type': 'application/wasm' },
+		});
 	}
 	return nativeFetch(resource, options);
 };
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":45692,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":50140,"index.wasm":39513091},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
