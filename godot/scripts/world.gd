@@ -44,6 +44,8 @@ var tutorial_mode:=false
 var tutorial_step:=0
 var tutorial_origin:=Vector3.ZERO
 var tutorial_attacks:=0
+var mill_blades:Node3D
+var mill_damage_cooldown:=0.0
 
 func _ready()->void:
 	_build_environment();_build_arena();_build_ui();_show_title()
@@ -113,6 +115,27 @@ func _build_arena()->void:
 			_tree(Vector3(x+randf_range(-.45,.45),0,z+randf_range(-.8,.8)),randf_range(.8,1.3))
 	for pos in [Vector3(-7,0,3),Vector3(7,0,1),Vector3(-7,0,-11),Vector3(7,0,-18),Vector3(-7,0,-27),Vector3(7,0,-36)]:
 		_foliage_cluster(pos)
+	_build_gauntlet_landmarks()
+
+func _build_gauntlet_landmarks()->void:
+	# A readable five-beat route: combat lawn, hedge lanes, mill hazard,
+	# locked rune grove, then the guardian arena.
+	var hedge_mat:=material(Color("#284d31"))
+	for data in [[-7.5,-11.5,5.0,1.2],[7.5,-14.0,5.0,1.2],[-5.0,-17.0,1.2,5.0],[5.0,-17.0,1.2,5.0]]:
+		box_part("Hedge",Vector3(data[2],1.7,data[3]),Vector3(data[0],.82,data[1]),hedge_mat,true)
+	for pos in [Vector3(-8.2,0,-8.8),Vector3(8.2,0,-18.3)]:
+		for i in 3:
+			var hay:=box_part("SecretHay",Vector3(1.15,.75,1.15),pos+Vector3(i*.5,.35,i*.15),material(Color("#9a793b")))
+			hay.rotation.y=randf_range(-.2,.2)
+	# The mill is a landmark and a spatial hazard, not background decoration.
+	box_part("MillTower",Vector3(2.2,5.2,2.2),Vector3(8.7,2.5,-10.5),material(Color("#66533d")),true)
+	mill_blades=Node3D.new();mill_blades.position=Vector3(7.45,3.0,-10.5);mill_blades.rotation.y=PI/2;add_child(mill_blades)
+	for angle in [0.0,PI/2]:
+		var blade:=MeshInstance3D.new();var bm:=BoxMesh.new();bm.size=Vector3(.24,5.5,.16);blade.mesh=bm;blade.material_override=material(Color("#c6ad72"));blade.rotation.z=angle;mill_blades.add_child(blade)
+	var mill_light:=OmniLight3D.new();mill_light.position=Vector3(7.0,2.7,-10.5);mill_light.light_color=Color("#ffc263");mill_light.light_energy=2.0;mill_light.omni_range=5;add_child(mill_light)
+	# Clearly marked exit dais rewards forward momentum while inviting cleanup.
+	var exit_ring:=TorusMesh.new();exit_ring.inner_radius=1.5;exit_ring.outer_radius=1.72
+	var exit_marker:=MeshInstance3D.new();exit_marker.mesh=exit_ring;exit_marker.material_override=material(Color("#7edc9c"),Color("#7edc9c"),2.2);exit_marker.position=Vector3(0,.12,-44);add_child(exit_marker)
 
 func _tree(pos:Vector3,scale_value:float)->void:
 	var trunk:=CylinderMesh.new();trunk.top_radius=.28*scale_value;trunk.bottom_radius=.48*scale_value;trunk.height=3.8*scale_value
@@ -248,7 +271,8 @@ func _advance_tutorial()->void:
 func _start_wave(number:int)->void:
 	stage=number
 	if number<=2:
-		wave_remaining=4+number*2;objective.text="WAVE %d  //  %d CREATURES" %[number,wave_remaining]
+		wave_remaining=4+number*2
+		objective.text=("FIELD AMBUSH" if number==1 else "HEDGE MAZE")+"  //  %d CREATURES"%wave_remaining
 		var room_z:float=-2.0 if number==1 else -14.0
 		for i in wave_remaining:
 			await get_tree().create_timer(.28).timeout
@@ -336,18 +360,23 @@ func enemy_defeated(kind:int)->void:
 	score+=250 if kind<3 else 2500;_refresh_score()
 	if kind==3:_victory()
 	elif stage<=2:
-		wave_remaining-=1;objective.text="WAVE %d  //  %d CREATURES" %[stage,max(wave_remaining,0)]
+		wave_remaining-=1;objective.text=("FIELD AMBUSH" if stage==1 else "HEDGE MAZE")+"  //  %d CREATURES"%max(wave_remaining,0)
 		if wave_remaining<=0:
 			pending_stage=stage+1;advance_target_z=-9.0 if pending_stage==2 else -21.0;awaiting_advance=true
 			objective.text="PATH OPEN  //  ADVANCE TO THE NEXT CHAMBER"
 
 func _process(delta:float)->void:
+	if is_instance_valid(mill_blades):
+		mill_blades.rotation.x+=delta*1.65
+		mill_damage_cooldown=max(0.0,mill_damage_cooldown-delta)
 	if game_started and is_instance_valid(hero) and is_instance_valid(camera):
 		var desired:=Vector3(clamp(hero.global_position.x*.18,-2.2,2.2),17,hero.global_position.z+16)
 		camera_shake=max(0.0,camera_shake-delta*3.0)
 		var amount:=camera_shake if screen_shake_enabled else 0.0
 		var shake:=Vector3(randf_range(-amount,amount),randf_range(-amount,amount),0)
 		camera.global_position=camera.global_position.lerp(desired+shake,1.0-exp(-delta*4.5))
+		if mill_damage_cooldown<=0 and hero.global_position.distance_to(Vector3(7.45,0,-10.5))<2.25:
+			hero.call("take_damage",18.0,Vector3(-5,0,0));mill_damage_cooldown=1.0;objective.text="WINDMILL HAZARD  //  TIME YOUR PASS"
 		if tutorial_mode:
 			if tutorial_step==0 and hero.global_position.distance_to(tutorial_origin)>2.2:_advance_tutorial()
 			elif tutorial_step==1 and Input.is_action_just_pressed("attack"):
