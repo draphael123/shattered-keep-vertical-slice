@@ -15,6 +15,8 @@ var health_bar:ProgressBar
 var ability_bar:ProgressBar
 var objective:Label
 var score_label:Label
+var tutorial_panel:ColorRect
+var tutorial_label:Label
 var selected_class:="Ironwarden"
 var score:=0
 var gold:=0
@@ -36,6 +38,10 @@ var camera_shake:=0.0
 var screen_shake_enabled:=true
 var damage_flashes_enabled:=true
 var master_volume:=85.0
+var tutorial_mode:=false
+var tutorial_step:=0
+var tutorial_origin:=Vector3.ZERO
+var tutorial_attacks:=0
 
 func _ready()->void:
 	_build_environment();_build_arena();_build_ui();_show_title()
@@ -54,15 +60,17 @@ func box_part(name:String,size:Vector3,pos:Vector3,mat:Material,collision:=false
 func _build_environment()->void:
 	var env:=WorldEnvironment.new();var e:=Environment.new();e.background_mode=Environment.BG_COLOR;e.background_color=Color("#040b0e")
 	e.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;e.ambient_light_color=Color("#6a8f91");e.ambient_light_energy=.36;e.tonemap_mode=Environment.TONE_MAPPER_FILMIC
-	e.glow_enabled=true;e.glow_intensity=1.3;e.fog_enabled=true;e.fog_light_color=Color("#153638");e.fog_density=.016;env.environment=e;add_child(env)
-	var moon:=DirectionalLight3D.new();moon.light_color=Color("#8fc9c7");moon.light_energy=1.1;moon.rotation_degrees=Vector3(-58,-32,0);moon.shadow_enabled=true;add_child(moon)
+	e.glow_enabled=true;e.glow_intensity=1.2;e.fog_enabled=true;e.fog_light_color=Color("#274536");e.fog_density=.022;env.environment=e;add_child(env)
+	var moon:=DirectionalLight3D.new();moon.light_color=Color("#b9d99b");moon.light_energy=1.25;moon.rotation_degrees=Vector3(-58,-32,0);moon.shadow_enabled=true;add_child(moon)
 	camera=Camera3D.new();camera.position=Vector3(0,17,16);camera.rotation_degrees=Vector3(-47,0,0);camera.fov=40;camera.current=true;add_child(camera)
 
 func _build_arena()->void:
-	var wall:=material(Color("#293f3e"));box_part("Floor",Vector3(26,.35,56),Vector3(0,-.2,-18),material(Color("#14282b")),true)
+	var wall:=material(Color("#30453d"));box_part("Floor",Vector3(26,.35,56),Vector3(0,-.2,-18),material(Color("#182d23")),true)
 	for x in range(-12,13,2):
 		for z in range(-44,9,2):
-			var tile:=box_part("Tile",Vector3(1.82,.08,1.82),Vector3(x,.02,z),material(Color("#20383a") if (x+z)%4==0 else Color("#192e30")))
+			var path_tile:bool=abs(x)<=5
+			var tile_color:Color=Color("#46554b") if path_tile else (Color("#25412f") if (x+z)%4==0 else Color("#203828"))
+			var tile:=box_part("Tile",Vector3(1.82,.08,1.82),Vector3(x,.02,z),material(tile_color))
 			tile.rotation.y=randf_range(-.018,.018)
 	box_part("NorthWall",Vector3(26,3.2,.8),Vector3(0,1.4,-46.2),wall,true)
 	box_part("SouthWallL",Vector3(8,.65,.8),Vector3(-9,.15,9.2),wall,true);box_part("SouthWallR",Vector3(8,.65,.8),Vector3(9,.15,9.2),wall,true)
@@ -98,6 +106,25 @@ func _build_arena()->void:
 			var tomb:=box_part("Sarcophagus",Vector3(2.2,.75,1.15),Vector3(x,.35,z),material(Color("#435655")))
 			tomb.rotation.y=PI/2
 			box_part("TombLid",Vector3(1.85,.16,.92),Vector3(x,.8,z),material(Color("#64706b")))
+	for z in range(-43,8,4):
+		for x in [-11.6,-9.8,9.8,11.6]:
+			_tree(Vector3(x+randf_range(-.45,.45),0,z+randf_range(-.8,.8)),randf_range(.8,1.3))
+	for pos in [Vector3(-7,0,3),Vector3(7,0,1),Vector3(-7,0,-11),Vector3(7,0,-18),Vector3(-7,0,-27),Vector3(7,0,-36)]:
+		_foliage_cluster(pos)
+
+func _tree(pos:Vector3,scale_value:float)->void:
+	var trunk:=CylinderMesh.new();trunk.top_radius=.28*scale_value;trunk.bottom_radius=.48*scale_value;trunk.height=3.8*scale_value
+	var t:=MeshInstance3D.new();t.mesh=trunk;t.material_override=material(Color("#49372b"));t.position=pos+Vector3(0,1.9*scale_value,0);add_child(t)
+	for offset in [Vector3(0,3.5,0),Vector3(-.65,2.9,.2),Vector3(.6,3.0,-.25)]:
+		var crown:=SphereMesh.new();crown.radius=1.15*scale_value;crown.height=2.0*scale_value
+		var c:=MeshInstance3D.new();c.mesh=crown;c.material_override=material(Color("#31583b"));c.position=pos+offset*scale_value;add_child(c)
+
+func _foliage_cluster(pos:Vector3)->void:
+	for i in 5:
+		var leaf:=SphereMesh.new();leaf.radius=randf_range(.18,.34);leaf.height=randf_range(.25,.55)
+		var n:=MeshInstance3D.new();n.mesh=leaf;n.material_override=material(Color("#4f7846"));n.position=pos+Vector3(randf_range(-.8,.8),.18,randf_range(-.6,.6));add_child(n)
+	var glow:=SphereMesh.new();glow.radius=.12;glow.height=.2
+	var g:=MeshInstance3D.new();g.mesh=glow;g.material_override=material(Color("#8fe1a1"),Color("#8fe1a1"),2.5);g.position=pos+Vector3(0,.25,0);add_child(g)
 
 func _build_ui()->void:
 	layer=CanvasLayer.new();add_child(layer)
@@ -115,6 +142,8 @@ func _build_ui()->void:
 	objective=Label.new();objective.position=Vector2(760,32);objective.size=Vector2(480,44);objective.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;objective.add_theme_font_size_override("font_size",16);hud.add_child(objective)
 	score_label=Label.new();score_label.position=Vector2(900,68);score_label.size=Vector2(340,30);score_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT;score_label.modulate=Color("#f4ca71");hud.add_child(score_label)
 	var controls:=Label.new();controls.text="MOVE  WASD / STICK     ATTACK  LMB / A     POWER  Q / X     DASH  SHIFT / B     PAUSE  ESC";controls.position=Vector2(284,680);controls.modulate=Color("#a5b8b3");controls.add_theme_font_size_override("font_size",12);hud.add_child(controls)
+	tutorial_panel=ColorRect.new();tutorial_panel.position=Vector2(350,545);tutorial_panel.size=Vector2(580,92);tutorial_panel.color=Color("#10231ee8");tutorial_panel.visible=false;hud.add_child(tutorial_panel)
+	tutorial_label=Label.new();tutorial_label.position=Vector2(22,14);tutorial_label.size=Vector2(536,66);tutorial_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;tutorial_label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;tutorial_label.add_theme_font_size_override("font_size",17);tutorial_label.modulate=Color("#e8e0bd");tutorial_panel.add_child(tutorial_label)
 
 func styled_button(text:String,pos:Vector2,size:Vector2,callable:Callable)->Button:
 	var b:=Button.new();b.text=text;b.position=pos;b.size=size;b.add_theme_font_size_override("font_size",18);b.pressed.connect(callable)
@@ -139,10 +168,11 @@ func _show_title()->void:
 	clear_menu();menu.visible=true;hud.visible=false
 	var sigil:=label("SK",Vector2(590,72),52,Color("#63d5ca"));sigil.size=Vector2(100,70);sigil.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	var title:=label("THE SHATTERED KEEP",Vector2(0,165),46,Color("#eadfc9"));title.size=Vector2(1280,60);title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-	var sub:=label("MOONCRYPT EXPEDITION",Vector2(0,226),16,Color("#67cfc6"));sub.size=Vector2(1280,30);sub.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-	var hook:=label("FOUR HEROES. ONE CURSED KEEP. ENDLESS MONSTERS.",Vector2(0,285),14,Color("#9aa9a4"));hook.size=Vector2(1280,30);hook.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-	styled_button("BEGIN EXPEDITION",Vector2(490,360),Vector2(300,56),_show_select)
-	styled_button("SETTINGS",Vector2(490,430),Vector2(300,48),_show_settings)
+	var sub:=label("WHISPERWOOD EXPEDITION",Vector2(0,226),16,Color("#8ed79a"));sub.size=Vector2(1280,30);sub.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	var hook:=label("ENTER THE WILD ROAD. BREAK THE ROOTBOUND CURSE.",Vector2(0,285),14,Color("#9eafa0"));hook.size=Vector2(1280,30);hook.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	styled_button("GUIDED TUTORIAL",Vector2(490,350),Vector2(300,54),func():tutorial_mode=true;_show_select())
+	styled_button("BEGIN EXPEDITION",Vector2(490,417),Vector2(300,52),func():tutorial_mode=false;_show_select())
+	styled_button("SETTINGS",Vector2(490,482),Vector2(300,46),_show_settings)
 	var foot:=label("A  G A U N T L E T - S T Y L E   A R C A D E   A D V E N T U R E",Vector2(0,600),11,Color("#687b78"));foot.size=Vector2(1280,20);foot.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 
 func _show_select()->void:
@@ -182,7 +212,25 @@ func _start_game(which:String)->void:
 	hero.connect("health_changed",_on_health);hero.connect("ability_changed",_on_ability)
 	hero.connect("impact",_on_impact)
 	_spawn_breakables()
-	_start_wave(1)
+	if tutorial_mode:
+		tutorial_step=0;tutorial_origin=hero.global_position;tutorial_attacks=0;tutorial_panel.visible=true
+		objective.text="TRAIL LESSON  //  MOVEMENT";_set_tutorial("MOVE\nUse WASD or the left stick to cross the glowing trail.")
+	else:_start_wave(1)
+
+func _set_tutorial(text:String)->void:
+	tutorial_label.text=text
+
+func _advance_tutorial()->void:
+	tutorial_step+=1
+	match tutorial_step:
+		1: objective.text="TRAIL LESSON  //  ATTACK";_set_tutorial("ATTACK\nStrike three times with Left Mouse or A.")
+		2: objective.text="TRAIL LESSON  //  POWER";_set_tutorial("CLASS POWER\nPress Q or X to unleash your hero's signature power.")
+		3: objective.text="TRAIL LESSON  //  DASH";_set_tutorial("DASH\nPress Shift or B to burst through danger.")
+		4: objective.text="TRAIL LESSON  //  BREAKABLES";_set_tutorial("SUPPLIES\nSmash a crate and collect what falls.")
+		_:
+			objective.text="TUTORIAL COMPLETE  //  THE TRAIL OPENS";_set_tutorial("TRAIL READY\nFollow the stone road. Monsters emerge from the forest.")
+			await get_tree().create_timer(1.8).timeout
+			tutorial_mode=false;tutorial_panel.visible=false;_start_wave(1)
 
 func _start_wave(number:int)->void:
 	stage=number
@@ -211,7 +259,7 @@ func _spawn_enemy(kind:int,pos:Vector3,elite:=false)->void:
 
 func _spawn_boss()->void:
 	if boss_spawned:return
-	boss_spawned=true;objective.text="THE CRYPT WARDEN  //  SLAY THE BOSS";_spawn_enemy(3,Vector3(0,0,-41))
+	boss_spawned=true;objective.text="THE THORN WARDEN  //  SLAY THE BOSS";_spawn_enemy(3,Vector3(0,0,-41))
 
 func _spawn_breakables()->void:
 	for i in 10:
@@ -223,6 +271,7 @@ func _spawn_breakables()->void:
 
 func breakable_destroyed(pos:Vector3)->void:
 	score+=100;_refresh_score()
+	if tutorial_mode and tutorial_step==4:_advance_tutorial()
 	if randf()<.7:
 		var health_drop:=randf()<.32
 		var count:=1 if health_drop else randi_range(3,6)
@@ -272,6 +321,14 @@ func _process(delta:float)->void:
 		var amount:=camera_shake if screen_shake_enabled else 0.0
 		var shake:=Vector3(randf_range(-amount,amount),randf_range(-amount,amount),0)
 		camera.global_position=camera.global_position.lerp(desired+shake,1.0-exp(-delta*4.5))
+		if tutorial_mode:
+			if tutorial_step==0 and hero.global_position.distance_to(tutorial_origin)>2.2:_advance_tutorial()
+			elif tutorial_step==1 and Input.is_action_just_pressed("attack"):
+				tutorial_attacks+=1
+				tutorial_label.text="ATTACK\nStrike three times with Left Mouse or A.  %d / 3"%tutorial_attacks
+				if tutorial_attacks>=3:_advance_tutorial()
+			elif tutorial_step==2 and Input.is_action_just_pressed("ability"):_advance_tutorial()
+			elif tutorial_step==3 and Input.is_action_just_pressed("dash"):_advance_tutorial()
 	if awaiting_advance and is_instance_valid(hero) and hero.global_position.z<advance_target_z:
 		awaiting_advance=false;_start_wave(pending_stage)
 	if game_started and gates_spawned and not boss_spawned:
@@ -295,7 +352,7 @@ func _quit_run()->void:
 
 func _victory()->void:
 	game_started=false;await get_tree().create_timer(.8).timeout;menu.visible=true;hud.visible=false;clear_menu()
-	var victory_heading:=label("CRYPT PURIFIED",Vector2(0,130),42,Color("#f4d179"));victory_heading.size=Vector2(1280,60);victory_heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	var victory_heading:=label("WHISPERWOOD RESTORED",Vector2(0,130),42,Color("#f4d179"));victory_heading.size=Vector2(1280,60);victory_heading.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	var saved:=label("THE KEEP GROWS STRONGER",Vector2(0,210),19,Color("#63d5ca"));saved.size=Vector2(1280,35);saved.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	var reward:=label("+ 1 RELIC SHARD     + FORGE RESTORATION",Vector2(0,285),16,Color("#ddd4c3"));reward.size=Vector2(1280,35);reward.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	var final_score:=label("FINAL SCORE   %06d"%score,Vector2(0,350),24,Color("#f4ca71"));final_score.size=Vector2(1280,40);final_score.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
