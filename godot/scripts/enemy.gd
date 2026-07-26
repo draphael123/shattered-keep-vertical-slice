@@ -9,10 +9,14 @@ var attack_timer:=0.0
 var attack_cooldown:=0.0
 var body:MeshInstance3D
 var tell:MeshInstance3D
+var tell_ring:MeshInstance3D
 var dead:=false
 var elite:=false
 var visual_root:Node3D
 var walk_time:=0.0
+var windup_duration:=0.5
+var attack_range:=1.8
+var windup_target:=Vector3.ZERO
 
 func setup(kind:int,is_elite:=false)->void:
 	enemy_type=kind;elite=is_elite
@@ -24,6 +28,7 @@ func setup(kind:int,is_elite:=false)->void:
 
 func material(color:Color,emission:=Color.BLACK,energy:=0.0)->StandardMaterial3D:
 	var m:=StandardMaterial3D.new();m.albedo_color=color;m.roughness=.72
+	if color.a<1.0:m.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
 	if energy>0:m.emission_enabled=true;m.emission=emission;m.emission_energy_multiplier=energy
 	return m
 
@@ -62,22 +67,49 @@ func _build()->void:
 	var shape:=CapsuleShape3D.new();shape.radius=.48;shape.height=1.5
 	var col:=CollisionShape3D.new();col.shape=shape;col.position.y=.75;add_child(col)
 	tell=MeshInstance3D.new();var tm:=CylinderMesh.new();tm.top_radius=1.5;tm.bottom_radius=1.5;tm.height=.025
-	tell.mesh=tm;tell.material_override=material(Color("#8b2018"),Color("#e84d2f"),1);tell.position.y=.04;tell.visible=false;add_child(tell)
+	attack_range=[1.75,1.55,2.15,2.9][enemy_type];windup_duration=[.46,.3,.8,1.15][enemy_type]
+	tm.top_radius=attack_range;tm.bottom_radius=attack_range
+	var tell_colors=[Color("#ff4938aa"),Color("#ffd34faa"),Color("#ff7138aa"),Color("#ff3028b8")]
+	tell.mesh=tm;tell.material_override=material(tell_colors[enemy_type],tell_colors[enemy_type],2.0);tell.position.y=.04;tell.visible=false;add_child(tell)
+	tell_ring=MeshInstance3D.new();var ring:=TorusMesh.new();ring.inner_radius=attack_range-.11;ring.outer_radius=attack_range
+	tell_ring.mesh=ring;tell_ring.material_override=material(tell_colors[enemy_type],tell_colors[enemy_type],4.0);tell_ring.position.y=.07;tell_ring.visible=false;add_child(tell_ring)
+
+func _begin_attack()->void:
+	attack_timer=windup_duration;windup_target=hero.global_position
+	tell.visible=true;tell_ring.visible=true;tell.scale=Vector3(.25,1,.25);tell_ring.scale=Vector3.ONE
+	var alert:=Label3D.new();alert.text="!";alert.font_size=54;alert.outline_size=12;alert.modulate=Color("#fff0a3");alert.position=Vector3(0,2.5,0);add_child(alert)
+	var pop:=create_tween().set_parallel();alert.scale=Vector3.ZERO;pop.tween_property(alert,"scale",Vector3.ONE,.12).set_trans(Tween.TRANS_BACK);pop.tween_property(alert,"position:y",2.85,windup_duration)
+	pop.chain().tween_property(alert,"modulate:a",0.0,.1);pop.chain().tween_callback(alert.queue_free)
+
+func _strike()->void:
+	tell.visible=false;tell_ring.visible=false;visual_root.rotation.x=.38
+	var snap:=create_tween().set_parallel();snap.tween_property(visual_root,"rotation:x",0.0,.18).set_trans(Tween.TRANS_BACK);snap.tween_property(visual_root,"scale",Vector3.ONE,.18).set_trans(Tween.TRANS_BACK)
+	var hit_range:=attack_range+.15
+	if hero.global_position.distance_to(global_position)<hit_range:hero.call("take_damage",damage,(hero.global_position-global_position).normalized()*8)
+	var shock:=MeshInstance3D.new();var rm:=TorusMesh.new();rm.inner_radius=.3;rm.outer_radius=.42
+	shock.mesh=rm;shock.material_override=material(Color("#ff7a43aa"),Color("#ff5038"),4.0);shock.position.y=.1;add_child(shock)
+	var burst:=create_tween().set_parallel();burst.tween_property(shock,"scale",Vector3.ONE*attack_range*2.2,.28);burst.tween_property(shock,"transparency",1.0,.28)
+	burst.chain().tween_callback(shock.queue_free);attack_cooldown=1.0 if enemy_type!=3 else 1.45
 
 func _physics_process(delta:float)->void:
 	if dead or not is_instance_valid(hero):return
 	attack_cooldown-=delta
 	var off:=hero.global_position-global_position;var dist:=off.length()
 	if attack_timer>0:
-		attack_timer-=delta;tell.visible=true;tell.scale=Vector3.ONE*(1+(0.52-attack_timer)*.5)
-		if attack_timer<=0:
-			tell.visible=false
-			if hero.global_position.distance_to(global_position)<(2.4 if enemy_type==3 else 1.8):hero.call("take_damage",damage,off.normalized()*6)
-			attack_cooldown=.85
-	elif dist<(2.2 if enemy_type==3 else 1.65) and attack_cooldown<=0:attack_timer=.52
+		attack_timer-=delta
+		var progress:float=clamp(1.0-attack_timer/windup_duration,0.0,1.0)
+		tell.scale=Vector3(lerp(.25,1.0,progress),1,lerp(.25,1.0,progress))
+		var ring_scale:float=lerp(1.0,.12,progress)
+		tell_ring.scale=Vector3(ring_scale,1,ring_scale)
+		tell.transparency=.25+sin(progress*PI*6.0)*.12
+		visual_root.rotation.x=-sin(progress*PI*.5)*(.26 if enemy_type<2 else .42)
+		visual_root.scale=Vector3(1.0+progress*.08,1.0-progress*.12,1.0+progress*.08)
+		if attack_timer<=0:_strike()
+	elif dist<attack_range-.1 and attack_cooldown<=0:_begin_attack()
 	elif dist>1.35:
 		velocity=off.normalized()*speed;rotation.y=atan2(-off.x,-off.z);move_and_slide()
-		walk_time+=delta*speed*2.4;visual_root.position.y=abs(sin(walk_time))*.09;visual_root.rotation.z=sin(walk_time)*.045
+		walk_time+=delta*speed*2.4;visual_root.position.y=abs(sin(walk_time))*.09;visual_root.rotation.z=sin(walk_time)*.065;visual_root.rotation.x=sin(walk_time*.5)*.035
+		visual_root.scale=Vector3(1.0-sin(walk_time)*.025,1.0+sin(walk_time)*.035,1.0-sin(walk_time)*.025)
 
 func take_damage(amount:float,push:Vector3)->void:
 	if dead:return

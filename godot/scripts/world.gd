@@ -249,13 +249,19 @@ func _start_wave(number:int)->void:
 	else:_spawn_boss()
 
 func _spawn_enemy(kind:int,pos:Vector3,elite:=false)->void:
-	var warning:=MeshInstance3D.new();var wm:=CylinderMesh.new();wm.top_radius=.7;wm.bottom_radius=.7;wm.height=.03
-	warning.mesh=wm;warning.material_override=material(Color("#4bd5ca"),Color("#4bd5ca"),2.6);warning.position=pos+Vector3(0,.04,0);add_child(warning)
-	var telegraph:=create_tween().set_parallel();warning.scale=Vector3(.15,.15,.15);telegraph.tween_property(warning,"scale",Vector3.ONE,0.38);telegraph.tween_property(warning,"transparency",1.0,.5)
-	await get_tree().create_timer(.42).timeout
+	var warning:=MeshInstance3D.new();var wm:=CylinderMesh.new();wm.top_radius=.78;wm.bottom_radius=.78;wm.height=.03
+	var warning_color:=Color("#f0573f") if kind>=2 else Color("#64e0a0")
+	warning.mesh=wm;warning.material_override=material(warning_color,warning_color,3.4);warning.position=pos+Vector3(0,.04,0);add_child(warning)
+	var ring:=MeshInstance3D.new();var rm:=TorusMesh.new();rm.inner_radius=.68;rm.outer_radius=.8
+	ring.mesh=rm;ring.material_override=material(Color("#fff0a0"),Color("#fff0a0"),4.0);ring.position=pos+Vector3(0,.07,0);add_child(ring)
+	var beacon:=MeshInstance3D.new();var bm:=CylinderMesh.new();bm.top_radius=.055;bm.bottom_radius=.22;bm.height=2.8
+	beacon.mesh=bm;beacon.material_override=material(warning_color,warning_color,2.4);beacon.position=pos+Vector3(0,1.4,0);add_child(beacon)
+	warning.scale=Vector3(.12,1,.12);ring.scale=Vector3(1.2,1,1.2);beacon.scale.y=.05
+	var telegraph:=create_tween().set_parallel();telegraph.tween_property(warning,"scale",Vector3.ONE,.5).set_trans(Tween.TRANS_QUAD);telegraph.tween_property(ring,"scale",Vector3(.15,1,.15),.5);telegraph.tween_property(beacon,"scale:y",1.0,.34).set_trans(Tween.TRANS_BACK)
+	await get_tree().create_timer(.52).timeout
 	var enemy:=CharacterBody3D.new();enemy.set_script(ENEMY);enemy.call("setup",kind,elite);add_child(enemy);enemy.global_position=pos
 	enemy.scale=Vector3(.2,.2,.2);var rise:=create_tween();rise.tween_property(enemy,"scale",Vector3.ONE*1.65 if kind==3 else Vector3.ONE,0.25).set_trans(Tween.TRANS_BACK)
-	warning.queue_free()
+	warning.queue_free();ring.queue_free();beacon.queue_free()
 
 func _spawn_boss()->void:
 	if boss_spawned:return
